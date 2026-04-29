@@ -40,12 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!roleError && hasRole) return true;
 
-      // Intentamos is_member (asumiendo que devuelve boolean)
-      const { data: isMember, error: memberError } = await supabase.rpc('is_member', {
-        _user_id: u.id
-      });
-
-      if (!memberError && isMember) return true;
+      // is_member RPC no existe en los tipos generados; se omite y se cae al fallback de tabla.
 
       // Si las funciones fallan o no existen, fallback a consulta de tabla user_roles
       const { data, error: tableError } = await supabase
