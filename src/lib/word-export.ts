@@ -1,8 +1,97 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   PageOrientation, Header, PageNumber, Footer, Table, TableRow, TableCell,
-  BorderStyle, WidthType,
+  BorderStyle, WidthType, ImageRun,
 } from "docx";
+import mermaid from "mermaid";
+
+// Inicializar mermaid una sola vez (solo navegador)
+let mermaidReady = false;
+function ensureMermaid() {
+  if (mermaidReady || typeof window === "undefined") return;
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: "default",
+    securityLevel: "loose",
+    fontFamily: "Times New Roman, serif",
+  });
+  mermaidReady = true;
+}
+
+/**
+ * Renderiza un bloque mermaid a PNG (Uint8Array) + dimensiones.
+ * Devuelve null si mermaid falla o si no estamos en el navegador.
+ */
+async function renderMermaidToPng(
+  code: string,
+  index: number
+): Promise<{ data: Uint8Array; width: number; height: number } | null> {
+  if (typeof window === "undefined" || typeof document === "undefined") return null;
+  try {
+    ensureMermaid();
+    const id = `mmd-export-${Date.now()}-${index}`;
+    const { svg } = await mermaid.render(id, code.trim());
+
+    // Asegurar dimensiones explícitas en el SVG
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svg, "image/svg+xml");
+    const svgEl = doc.documentElement as unknown as SVGSVGElement;
+
+    let width = parseFloat(svgEl.getAttribute("width") || "0");
+    let height = parseFloat(svgEl.getAttribute("height") || "0");
+    if ((!width || !height) && svgEl.getAttribute("viewBox")) {
+      const [, , w, h] = svgEl.getAttribute("viewBox")!.split(/\s+/).map(Number);
+      width = width || w;
+      height = height || h;
+    }
+    if (!width || !height) { width = 800; height = 600; }
+
+    // Escalar para nitidez
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    const svgString = new XMLSerializer().serializeToString(svgEl);
+    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = await new Promise<HTMLImageElement | null>((resolve) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => resolve(null);
+      i.src = url;
+    });
+    if (!img) { URL.revokeObjectURL(url); return null; }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/png")
+    );
+    if (!blob) return null;
+    const buf = new Uint8Array(await blob.arrayBuffer());
+
+    // Encajar en ancho útil de página (~6.5" = 624px @ 96dpi)
+    const maxW = 600;
+    let outW = width;
+    let outH = height;
+    if (outW > maxW) {
+      const r = maxW / outW;
+      outW = maxW;
+      outH = Math.round(height * r);
+    }
+    return { data: buf, width: Math.round(outW), height: Math.round(outH) };
+  } catch (e) {
+    console.warn("[mermaid] render falló:", e);
+    return null;
+  }
+}
 
 type ExportInput = {
   titulo: string;
