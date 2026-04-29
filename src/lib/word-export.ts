@@ -42,15 +42,24 @@ async function renderMermaidToPng(
   index: number
 ): Promise<{ data: Uint8Array; width: number; height: number } | null> {
   if (typeof window === "undefined" || typeof document === "undefined") return null;
+  // Contenedor temporal en el DOM (mermaid lo necesita para medir texto)
+  const host = document.createElement("div");
+  host.id = `mmd-host-${Date.now()}-${index}`;
+  host.style.cssText = "position:fixed;left:-99999px;top:0;visibility:hidden;width:1200px;";
+  document.body.appendChild(host);
   try {
     ensureMermaid();
     const id = `mmd-export-${Date.now()}-${index}`;
-    const { svg } = await mermaid.render(id, code.trim());
+    // mermaid v10+ acepta tercer parámetro container
+    const { svg } = await mermaid.render(id, code.trim(), host as unknown as HTMLElement);
 
-    // Asegurar dimensiones explícitas en el SVG
     const parser = new DOMParser();
     const doc = parser.parseFromString(svg, "image/svg+xml");
     const svgEl = doc.documentElement as unknown as SVGSVGElement;
+
+    // Asegurar xmlns para que <img> pueda cargarlo
+    if (!svgEl.getAttribute("xmlns")) svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    if (!svgEl.getAttribute("xmlns:xlink")) svgEl.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
 
     let width = parseFloat(svgEl.getAttribute("width") || "0");
     let height = parseFloat(svgEl.getAttribute("height") || "0");
@@ -60,8 +69,9 @@ async function renderMermaidToPng(
       height = height || h;
     }
     if (!width || !height) { width = 800; height = 600; }
+    svgEl.setAttribute("width", String(width));
+    svgEl.setAttribute("height", String(height));
 
-    // Escalar para nitidez
     const scale = 2;
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(width * scale);
@@ -70,21 +80,21 @@ async function renderMermaidToPng(
     if (!ctx) return null;
 
     const svgString = new XMLSerializer().serializeToString(svgEl);
-    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
+    // data URL evita restricciones de CSP/Blob en algunos entornos
+    const dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
 
     const img = await new Promise<HTMLImageElement | null>((resolve) => {
       const i = new Image();
+      i.crossOrigin = "anonymous";
       i.onload = () => resolve(i);
       i.onerror = () => resolve(null);
-      i.src = url;
+      i.src = dataUrl;
     });
-    if (!img) { URL.revokeObjectURL(url); return null; }
+    if (!img) return null;
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(url);
 
     const blob: Blob | null = await new Promise((resolve) =>
       canvas.toBlob((b) => resolve(b), "image/png")
@@ -92,7 +102,6 @@ async function renderMermaidToPng(
     if (!blob) return null;
     const buf = new Uint8Array(await blob.arrayBuffer());
 
-    // Encajar en ancho útil de página (~6.5" = 624px @ 96dpi)
     const maxW = 600;
     let outW = width;
     let outH = height;
@@ -105,6 +114,8 @@ async function renderMermaidToPng(
   } catch (e) {
     console.warn("[mermaid] render falló:", e);
     return null;
+  } finally {
+    host.remove();
   }
 }
 
