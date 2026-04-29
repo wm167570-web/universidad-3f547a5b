@@ -11,11 +11,26 @@ function ensureMermaid() {
   if (mermaidReady || typeof window === "undefined") return;
   mermaid.initialize({
     startOnLoad: false,
-    theme: "default",
+    theme: "neutral",
     securityLevel: "loose",
-    fontFamily: "Times New Roman, serif",
+    fontFamily: "Arial, Helvetica, sans-serif",
+    flowchart: { htmlLabels: false, useMaxWidth: false, curve: "basis" },
+    sequence: { useMaxWidth: false },
+    gantt: { useMaxWidth: false },
   });
   mermaidReady = true;
+}
+
+/** Limpia un string de markdown inline y etiquetas HTML simples. */
+function stripInlineMarkup(text: string): string {
+  return text
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/?[a-z][^>]*>/gi, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
 }
 
 /**
