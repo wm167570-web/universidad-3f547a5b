@@ -490,7 +490,9 @@ function blankLine(): Paragraph {
   });
 }
 
-function parseInline(text: string): TextRun[] {
+function parseInline(input: string): TextRun[] {
+  // Limpiar HTML residual antes de procesar markdown inline
+  const text = input.replace(/<\/?[a-z][^>]*>/gi, "");
   const runs: TextRun[] = [];
   const regex = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
   let last = 0;
