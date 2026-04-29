@@ -87,20 +87,29 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
   const { location } = useRouterState();
-  
+  const [fallbackTimeout, setFallbackTimeout] = useState(false);
+
+  // Si la carga toma más de 3.5s, dejamos pasar al contenido (con skeletons)
+  // para evitar el spinner infinito si el perfil/rol no resuelve.
+  useEffect(() => {
+    if (!loading) {
+      setFallbackTimeout(false);
+      return;
+    }
+    const t = setTimeout(() => setFallbackTimeout(true), 3500);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   useEffect(() => {
     if (loading) return;
 
     const isAuthPage = location.pathname === "/login";
-    
-    // 1. No hay usuario -> ir a Login (/login)
+
     if (!user && !isAuthPage) {
       navigate({ to: "/login" });
       return;
     }
 
-    // 2. Hay usuario pero sin rol -> ir a Login (/login)
-    // Esto previene que usuarios sin registro en user_roles vean el contenido
     if (user && !role && !isAuthPage) {
       navigate({ to: "/login" });
       return;
@@ -109,11 +118,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = location.pathname === "/login";
 
-  // Protección de Datos: Bloquear renderizado hasta que la validación se complete
-  if (loading && !isAuthPage) {
+  if (loading && !isAuthPage && !fallbackTimeout) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#1a0505]">
-        <div className="size-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-amber-200/60 uppercase tracking-widest">Cargando sesión…</p>
+        </div>
       </div>
     );
   }
