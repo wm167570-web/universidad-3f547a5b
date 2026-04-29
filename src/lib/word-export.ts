@@ -195,6 +195,53 @@ export async function exportarTrabajoWord(input: ExportInput): Promise<Blob> {
 
     if (!line) continue;
 
+    // ===== Bloques de código con triple backtick (```lang ... ```) =====
+    if (line.startsWith("```")) {
+      const lang = line.slice(3).trim().toLowerCase();
+      const buf: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        buf.push(lines[i]);
+        i++;
+      }
+      // i queda en la línea de cierre ``` (o al final)
+      const code = buf.join("\n");
+
+      if (lang === "mermaid") {
+        const png = await renderMermaidToPng(code, children.length);
+        if (png) {
+          children.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { line: LINE_DOUBLE, before: 240, after: 120 },
+              children: [
+                new ImageRun({
+                  type: "png",
+                  data: png.data,
+                  transformation: { width: png.width, height: png.height },
+                  altText: { title: "Diagrama", description: "Diagrama Mermaid", name: "diagrama" },
+                }),
+              ],
+            })
+          );
+        } else {
+          // Fallback: nota discreta sin filtrar el código fuente
+          children.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { line: LINE_DOUBLE, before: 120, after: 120 },
+              children: [new TextRun({
+                text: "[Diagrama no disponible]",
+                italics: true, size: SIZE, font: FONT, color: "888888",
+              })],
+            })
+          );
+        }
+      }
+      // Cualquier otro bloque de código: se omite del documento (no se vuelca como texto plano).
+      continue;
+    }
+
     // Detección de Título de Tabla (Ej: "Tabla 1. Matriz de Interesados")
     if (line.match(/^Tabla\s+\d+[:.]/i) && i + 1 < lines.length && lines[i + 1].trim().startsWith("|")) {
       children.push(
