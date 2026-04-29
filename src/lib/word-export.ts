@@ -444,6 +444,29 @@ function createAPATable(rows: string[][]): Table {
       const isHeader = rowIndex === 0;
       return new TableRow({
         children: cells.map(cellText => {
+          // Convertir <br> en saltos de línea reales y limpiar otras etiquetas HTML
+          const normalized = cellText
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/?[a-z][^>]*>/gi, "");
+          const lines = normalized.split(/\r?\n/);
+
+          const paragraphs = lines.map((ln, idx) => {
+            const runs = parseInline(ln);
+            // Si es header, forzar negrita en todos los runs
+            const finalRuns = isHeader
+              ? runs.map(r => new TextRun({ ...(r as any).options, bold: true, font: FONT, size: SIZE }))
+              : runs;
+            return new Paragraph({
+              alignment: AlignmentType.LEFT,
+              spacing: {
+                line: 276,
+                before: idx === 0 ? 80 : 0,
+                after: idx === lines.length - 1 ? 80 : 0,
+              },
+              children: finalRuns.length ? finalRuns : [new TextRun({ text: "", font: FONT, size: SIZE })],
+            });
+          });
+
           return new TableCell({
             borders: {
               top: isHeader ? { style: BorderStyle.SINGLE, size: 4 } : { style: BorderStyle.NONE },
@@ -451,13 +474,8 @@ function createAPATable(rows: string[][]): Table {
               left: { style: BorderStyle.NONE },
               right: { style: BorderStyle.NONE },
             },
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.BOTH, // Texto justificado como se pidió
-                spacing: { line: 240, before: 120, after: 120 },
-                children: [new TextRun({ text: cellText, size: SIZE, font: FONT, bold: isHeader })],
-              })
-            ],
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            children: paragraphs,
           });
         }),
       });
