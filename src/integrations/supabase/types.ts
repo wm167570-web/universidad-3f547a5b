@@ -58,6 +58,48 @@ export type Database = {
           },
         ]
       }
+      materia_encuentros: {
+        Row: {
+          created_at: string
+          enlace_grabacion: string | null
+          enlace_sesion: string | null
+          fecha: string
+          hora: string | null
+          id: string
+          materia_id: string
+          notas: string | null
+          tematica: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enlace_grabacion?: string | null
+          enlace_sesion?: string | null
+          fecha: string
+          hora?: string | null
+          id?: string
+          materia_id: string
+          notas?: string | null
+          tematica: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enlace_grabacion?: string | null
+          enlace_sesion?: string | null
+          fecha?: string
+          hora?: string | null
+          id?: string
+          materia_id?: string
+          notas?: string | null
+          tematica?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       materias: {
         Row: {
           codigo: string | null
@@ -69,6 +111,7 @@ export type Database = {
           estado: string
           id: string
           nombre: string
+          resultados_aprendizaje: string | null
           semestre: string | null
           updated_at: string
           user_id: string
@@ -83,6 +126,7 @@ export type Database = {
           estado?: string
           id?: string
           nombre: string
+          resultados_aprendizaje?: string | null
           semestre?: string | null
           updated_at?: string
           user_id: string
@@ -97,6 +141,7 @@ export type Database = {
           estado?: string
           id?: string
           nombre?: string
+          resultados_aprendizaje?: string | null
           semestre?: string | null
           updated_at?: string
           user_id?: string
@@ -576,12 +621,6 @@ export type Database = {
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_member: {
-        Args: {
           _user_id: string
         }
         Returns: boolean
