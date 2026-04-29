@@ -135,21 +135,40 @@ function DashboardPage() {
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <KPI label="Promedio" value={stats.promedio.toFixed(2)} icon={Trophy} tone="success" />
-        <KPI 
-          label="Materias en curso" 
-          value={`${stats.cursadas} / ${stats.totalMaterias}`} 
-          icon={BookOpen} 
-          tone="warning"
-          progress={(stats.cursadas / stats.totalMaterias) * 100}
-        />
-        <KPI 
-          label="Trabajos pendientes" 
-          value={`${stats.pendientes} / ${stats.entregados}`} 
-          icon={stats.pendientes === 0 ? CheckCircle : Clock} 
-          tone={stats.pendientes === 0 ? "success" : undefined}
-        />
-        <KPI label="Alertas (7 días)" value={String(stats.alertas)} icon={AlertTriangle} tone="warning" />
+        {dataLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="border-border/60">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 space-y-3">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-7 w-20" />
+                    <Skeleton className="h-1 w-full" />
+                  </div>
+                  <Skeleton className="size-10 rounded-lg" />
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <>
+            <KPI label="Promedio" value={stats.promedio.toFixed(2)} icon={Trophy} tone="success" />
+            <KPI
+              label="Materias en curso"
+              value={`${stats.cursadas} / ${stats.totalMaterias}`}
+              icon={BookOpen}
+              tone="warning"
+              progress={(stats.cursadas / stats.totalMaterias) * 100}
+            />
+            <KPI
+              label="Trabajos pendientes"
+              value={`${stats.pendientes} / ${stats.entregados}`}
+              icon={stats.pendientes === 0 ? CheckCircle : Clock}
+              tone={stats.pendientes === 0 ? "success" : undefined}
+            />
+            <KPI label="Alertas (7 días)" value={String(stats.alertas)} icon={AlertTriangle} tone="warning" />
+          </>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
