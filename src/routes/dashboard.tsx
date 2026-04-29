@@ -190,7 +190,19 @@ function DashboardPage() {
             <Trophy className="size-4 text-muted-foreground opacity-50" />
           </CardHeader>
           <CardContent>
-            {proximasEntregas.length === 0 ? (
+            {trabajosLoading ? (
+              <ul className="divide-y divide-border">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <li key={i} className="py-3 flex items-center justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="h-3 w-16" />
+                  </li>
+                ))}
+              </ul>
+            ) : proximasEntregas.length === 0 ? (
               <div className="text-sm text-muted-foreground py-8 text-center">
                 No hay entregas próximas.
               </div>
