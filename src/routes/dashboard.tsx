@@ -46,7 +46,7 @@ function DashboardPage() {
     }
   }, [user?.id, queryClient]);
 
-  const { data: materias } = useQuery({
+  const { data: materias, isLoading: materiasLoading } = useQuery({
     enabled: !!user,
     queryKey: ["materias", user?.id],
     queryFn: async () => {
@@ -58,7 +58,7 @@ function DashboardPage() {
     refetchOnWindowFocus: true
   });
 
-  const { data: trabajos } = useQuery({
+  const { data: trabajos, isLoading: trabajosLoading } = useQuery({
     enabled: !!user,
     queryKey: ["trabajos-dashboard", user?.id],
     queryFn: async () => {
@@ -67,6 +67,8 @@ function DashboardPage() {
       return data ?? [];
     },
   });
+
+  const dataLoading = materiasLoading || trabajosLoading;
 
   const stats = useMemo(() => {
     const totalMaterias = 19; // Según referencia técnica
