@@ -11,11 +11,26 @@ function ensureMermaid() {
   if (mermaidReady || typeof window === "undefined") return;
   mermaid.initialize({
     startOnLoad: false,
-    theme: "default",
+    theme: "neutral",
     securityLevel: "loose",
-    fontFamily: "Times New Roman, serif",
+    fontFamily: "Arial, Helvetica, sans-serif",
+    flowchart: { htmlLabels: false, useMaxWidth: false, curve: "basis" },
+    sequence: { useMaxWidth: false },
+    gantt: { useMaxWidth: false },
   });
   mermaidReady = true;
+}
+
+/** Limpia un string de markdown inline y etiquetas HTML simples. */
+function stripInlineMarkup(text: string): string {
+  return text
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/?[a-z][^>]*>/gi, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
 }
 
 /**
@@ -27,15 +42,24 @@ async function renderMermaidToPng(
   index: number
 ): Promise<{ data: Uint8Array; width: number; height: number } | null> {
   if (typeof window === "undefined" || typeof document === "undefined") return null;
+  // Contenedor temporal en el DOM (mermaid lo necesita para medir texto)
+  const host = document.createElement("div");
+  host.id = `mmd-host-${Date.now()}-${index}`;
+  host.style.cssText = "position:fixed;left:-99999px;top:0;visibility:hidden;width:1200px;";
+  document.body.appendChild(host);
   try {
     ensureMermaid();
     const id = `mmd-export-${Date.now()}-${index}`;
-    const { svg } = await mermaid.render(id, code.trim());
+    // mermaid v10+ acepta tercer parámetro container
+    const { svg } = await mermaid.render(id, code.trim(), host as unknown as HTMLElement);
 
-    // Asegurar dimensiones explícitas en el SVG
     const parser = new DOMParser();
     const doc = parser.parseFromString(svg, "image/svg+xml");
     const svgEl = doc.documentElement as unknown as SVGSVGElement;
+
+    // Asegurar xmlns para que <img> pueda cargarlo
+    if (!svgEl.getAttribute("xmlns")) svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    if (!svgEl.getAttribute("xmlns:xlink")) svgEl.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
 
     let width = parseFloat(svgEl.getAttribute("width") || "0");
     let height = parseFloat(svgEl.getAttribute("height") || "0");
@@ -45,8 +69,9 @@ async function renderMermaidToPng(
       height = height || h;
     }
     if (!width || !height) { width = 800; height = 600; }
+    svgEl.setAttribute("width", String(width));
+    svgEl.setAttribute("height", String(height));
 
-    // Escalar para nitidez
     const scale = 2;
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(width * scale);
@@ -55,21 +80,21 @@ async function renderMermaidToPng(
     if (!ctx) return null;
 
     const svgString = new XMLSerializer().serializeToString(svgEl);
-    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
+    // data URL evita restricciones de CSP/Blob en algunos entornos
+    const dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
 
     const img = await new Promise<HTMLImageElement | null>((resolve) => {
       const i = new Image();
+      i.crossOrigin = "anonymous";
       i.onload = () => resolve(i);
       i.onerror = () => resolve(null);
-      i.src = url;
+      i.src = dataUrl;
     });
-    if (!img) { URL.revokeObjectURL(url); return null; }
+    if (!img) return null;
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(url);
 
     const blob: Blob | null = await new Promise((resolve) =>
       canvas.toBlob((b) => resolve(b), "image/png")
@@ -77,7 +102,6 @@ async function renderMermaidToPng(
     if (!blob) return null;
     const buf = new Uint8Array(await blob.arrayBuffer());
 
-    // Encajar en ancho útil de página (~6.5" = 624px @ 96dpi)
     const maxW = 600;
     let outW = width;
     let outH = height;
@@ -90,6 +114,8 @@ async function renderMermaidToPng(
   } catch (e) {
     console.warn("[mermaid] render falló:", e);
     return null;
+  } finally {
+    host.remove();
   }
 }
 
@@ -418,6 +444,29 @@ function createAPATable(rows: string[][]): Table {
       const isHeader = rowIndex === 0;
       return new TableRow({
         children: cells.map(cellText => {
+          // Convertir <br> en saltos de línea reales y limpiar otras etiquetas HTML
+          const normalized = cellText
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/?[a-z][^>]*>/gi, "");
+          const lines = normalized.split(/\r?\n/);
+
+          const paragraphs = lines.map((ln, idx) => {
+            const runs = parseInline(ln);
+            // Si es header, forzar negrita en todos los runs
+            const finalRuns = isHeader
+              ? runs.map(r => new TextRun({ ...(r as any).options, bold: true, font: FONT, size: SIZE }))
+              : runs;
+            return new Paragraph({
+              alignment: AlignmentType.LEFT,
+              spacing: {
+                line: 276,
+                before: idx === 0 ? 80 : 0,
+                after: idx === lines.length - 1 ? 80 : 0,
+              },
+              children: finalRuns.length ? finalRuns : [new TextRun({ text: "", font: FONT, size: SIZE })],
+            });
+          });
+
           return new TableCell({
             borders: {
               top: isHeader ? { style: BorderStyle.SINGLE, size: 4 } : { style: BorderStyle.NONE },
@@ -425,13 +474,8 @@ function createAPATable(rows: string[][]): Table {
               left: { style: BorderStyle.NONE },
               right: { style: BorderStyle.NONE },
             },
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.BOTH, // Texto justificado como se pidió
-                spacing: { line: 240, before: 120, after: 120 },
-                children: [new TextRun({ text: cellText, size: SIZE, font: FONT, bold: isHeader })],
-              })
-            ],
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            children: paragraphs,
           });
         }),
       });
@@ -446,7 +490,9 @@ function blankLine(): Paragraph {
   });
 }
 
-function parseInline(text: string): TextRun[] {
+function parseInline(input: string): TextRun[] {
+  // Limpiar HTML residual antes de procesar markdown inline
+  const text = input.replace(/<\/?[a-z][^>]*>/gi, "");
   const runs: TextRun[] = [];
   const regex = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
   let last = 0;
