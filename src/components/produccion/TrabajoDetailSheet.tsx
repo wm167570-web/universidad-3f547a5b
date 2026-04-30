@@ -172,7 +172,43 @@ export function TrabajoDetailSheet({
     } finally { setBusy(null); }
   };
 
-  // ✅ Fix #4: El Sheet SIEMPRE se renderiza — preserva la animación de cierre.
+  const handleExportarExcel = async () => {
+    if (!trabajo) return;
+    setBusy("xls");
+    try {
+      const texto = humanizado?.trim() || contenido?.trim();
+      if (!texto) { toast.error("Sin contenido para exportar"); setBusy(null); return; }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = user
+        ? await supabase
+            .from("profiles")
+            .select("display_name, programa")
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : { data: null };
+
+      const blob = await exportarTrabajoExcel({
+        titulo: trabajo.titulo,
+        tipo: trabajo.tipo,
+        autor: profile?.display_name ?? user?.email ?? undefined,
+        institucion: profile?.programa ?? undefined,
+        curso: trabajo.materias?.nombre ?? undefined,
+        docente: trabajo.materias?.docente ?? undefined,
+        contenido: texto,
+        referencias: refs?.map((r) => r.cita_apa ?? "").filter(Boolean) ?? [],
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${trabajo.titulo.replace(/[^a-z0-9]+/gi, "_")}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Excel descargado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error exportando Excel");
+    } finally { setBusy(null); }
+  };
   // Antes: "if (!trabajo) return null" eliminaba el componente antes de que el Sheet
   // pudiera animarse al cerrar, causando un cierre abrupto sin transición.
   return (
