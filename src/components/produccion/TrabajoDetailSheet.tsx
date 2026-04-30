@@ -25,7 +25,7 @@ export function TrabajoDetailSheet({
   const qc = useQueryClient();
   const [contenido, setContenido] = useState("");
   const [humanizado, setHumanizado] = useState("");
-  const [busy, setBusy] = useState<null | "gen" | "hum" | "exp">(null);
+  const [busy, setBusy] = useState<null | "gen" | "hum" | "exp" | "xls">(null);
 
   const { data: trabajo, isLoading } = useQuery({
     enabled: !!trabajoId,
