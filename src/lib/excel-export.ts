@@ -462,21 +462,21 @@ function buildSupuestosYFinanzas(
   headers.forEach((h, i) => (fin.getCell(headerRow, i + 1).value = h));
   styleHeaderRow(fin.getRow(headerRow));
 
-  // Filas con fórmulas activas referenciando Supuestos
+  // Filas con fórmulas activas y referencias explícitas entre hojas.
   const conceptos: Array<{ label: string; formula: (col: string, prev?: string) => string; fmt?: string; bold?: boolean; fill?: string }> = [
     {
       label: "Ingresos",
-      formula: (col, prev) => (prev ? `${prev}*(1+Crecimiento)` : `Ingreso_Inicial`),
+      formula: (_col, prev) => (prev ? `${prev}4*(1+${refs.crecimiento})` : refs.ingreso),
       fmt: "$#,##0;($#,##0);-",
     },
     {
       label: "Costos variables",
-      formula: (col) => `-${col}4*Costo_Variable_Pct`,
+      formula: (col) => `-${col}4*${refs.costoVariable}`,
       fmt: "$#,##0;($#,##0);-",
     },
     {
       label: "Costos fijos",
-      formula: () => `-Costo_Fijo`,
+      formula: () => `-${refs.costoFijo}`,
       fmt: "$#,##0;($#,##0);-",
     },
     {
@@ -488,7 +488,7 @@ function buildSupuestosYFinanzas(
     },
     {
       label: "Impuestos",
-      formula: (col) => `IF(${col}7>0,-${col}7*Tasa_Impuestos,0)`,
+      formula: (col) => `IF(${col}7>0,-${col}7*${refs.impuestos},0)`,
       fmt: "$#,##0;($#,##0);-",
     },
     {
@@ -518,7 +518,7 @@ function buildSupuestosYFinanzas(
     cols.forEach((col, ci) => {
       const prev = ci > 0 ? cols[ci - 1] : undefined;
       const cell = fin.getCell(r, ci + 2);
-      cell.value = { formula: c.formula(col, prev) } as any;
+      cell.value = formula(c.formula(col, prev));
       if (c.fmt) cell.numFmt = c.fmt;
       if (c.bold) cell.font = { bold: true };
       if (c.fill)
@@ -531,17 +531,12 @@ function buildSupuestosYFinanzas(
   const vpnRow = headerRow + conceptos.length + 2;
   fin.getCell(vpnRow, 1).value = "VPN del flujo de caja";
   fin.getCell(vpnRow, 1).font = { bold: true };
-  fin.getCell(vpnRow, 2).value = {
-    formula: `-Inversion_Inicial+NPV(WACC,B${headerRow + 8}:F${headerRow + 8})`,
-  } as any;
+  fin.getCell(vpnRow, 2).value = formula(`-${refs.inversion}+NPV(${refs.wacc},B${headerRow + 8}:F${headerRow + 8})`);
   fin.getCell(vpnRow, 2).numFmt = "$#,##0;($#,##0);-";
   fin.getCell(vpnRow, 2).font = { bold: true, color: { argb: "FF059669" } };
 
   fin.getCell(vpnRow + 1, 1).value = "TIR";
   fin.getCell(vpnRow + 1, 1).font = { bold: true };
-  fin.getCell(vpnRow + 1, 2).value = {
-    formula: `IFERROR(IRR((-Inversion_Inicial,B${headerRow + 8},C${headerRow + 8},D${headerRow + 8},E${headerRow + 8},F${headerRow + 8})),0)`,
-  } as any;
   // IRR no acepta lista literal: usar rango auxiliar. Construimos uno en H.
   fin.getCell("H3").value = "Flujo descontable";
   fin.getCell("H3").font = { bold: true, color: { argb: COLOR_HEADER_TEXT } };
@@ -550,15 +545,13 @@ function buildSupuestosYFinanzas(
     pattern: "solid",
     fgColor: { argb: COLOR_HEADER },
   };
-  fin.getCell("H4").value = { formula: `-Inversion_Inicial` } as any;
+  fin.getCell("H4").value = formula(`-${refs.inversion}`);
   for (let i = 0; i < 5; i++) {
-    fin.getCell(`H${5 + i}`).value = {
-      formula: `${cols[i]}${headerRow + 8}`,
-    } as any;
+    fin.getCell(`H${5 + i}`).value = formula(`${cols[i]}${headerRow + 8}`);
     fin.getCell(`H${5 + i}`).numFmt = "$#,##0;($#,##0);-";
   }
   fin.getCell("H4").numFmt = "$#,##0;($#,##0);-";
-  fin.getCell(vpnRow + 1, 2).value = { formula: `IFERROR(IRR(H4:H9),0)` } as any;
+  fin.getCell(vpnRow + 1, 2).value = formula(`IFERROR(IRR(H4:H9),0)`);
   fin.getCell(vpnRow + 1, 2).numFmt = "0.00%";
   fin.getCell(vpnRow + 1, 2).font = { bold: true, color: { argb: "FF059669" } };
 
@@ -584,7 +577,7 @@ function buildSupuestosYFinanzas(
     fin.getCell(gRow + 1, i + 2).value = `Año ${i + 1}`;
     fin.getCell(gRow + 1, i + 2).font = { bold: true };
     fin.getCell(gRow + 1, i + 2).alignment = { horizontal: "center" };
-    fin.getCell(gRow + 2, i + 2).value = { formula: `${col}4` } as any;
+    fin.getCell(gRow + 2, i + 2).value = formula(`${col}4`);
     fin.getCell(gRow + 2, i + 2).numFmt = "$#,##0";
     fin.getCell(gRow + 2, i + 2).alignment = { horizontal: "center" };
   });
