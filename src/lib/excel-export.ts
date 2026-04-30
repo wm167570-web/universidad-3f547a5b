@@ -621,6 +621,7 @@ export async function exportarTrabajoExcel(input: ExcelExportInput): Promise<Blo
   const wb = new ExcelJS.Workbook();
   wb.creator = "AcadémicoPro";
   wb.created = new Date();
+  wb.calcProperties.fullCalcOnLoad = true;
 
   const tablas = extractTables(input.contenido);
 
