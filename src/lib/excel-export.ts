@@ -626,8 +626,8 @@ export async function exportarTrabajoExcel(input: ExcelExportInput): Promise<Blo
 
   buildResumen(wb, input, tablas);
   buildContenido(wb, input);
-  tablas.forEach((t, i) => buildTabla(wb, t, i));
-  buildSupuestosYFinanzas(wb, input, tablas);
+  const tableSheets = tablas.map((t, i) => buildTabla(wb, t, i));
+  buildSupuestosYFinanzas(wb, input, tablas, tableSheets);
   buildBibliografia(wb, input.referencias ?? []);
 
   const buf = await wb.xlsx.writeBuffer();
