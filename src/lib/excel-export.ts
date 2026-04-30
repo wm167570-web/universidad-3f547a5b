@@ -282,11 +282,8 @@ function buildTabla(
   wb: ExcelJS.Workbook,
   table: MarkdownTable,
   index: number,
-): { sheetName: string; numericCols: number[]; rowCount: number } {
-  const baseName = (table.titulo ?? `Tabla ${index + 1}`).slice(0, 28).replace(/[\\/\?\*\[\]:]/g, " ");
-  let name = baseName || `Tabla ${index + 1}`;
-  let n = 2;
-  while (wb.getWorksheet(name)) name = `${baseName} ${n++}`.slice(0, 31);
+): TableSheetInfo {
+  const name = uniqueSheetName(wb, table.titulo, `Tabla ${index + 1}`);
   const ws = wb.addWorksheet(name);
 
   // Título
@@ -349,7 +346,7 @@ function buildTabla(
       const fromRow = startRow + 1;
       const toRow = startRow + table.rows.length;
       const cell = ws.getCell(totalRowIdx, c + 1);
-      cell.value = { formula: `SUM(${colLetter}${fromRow}:${colLetter}${toRow})` } as any;
+      cell.value = formula(`SUM(${colLetter}${fromRow}:${colLetter}${toRow})`);
       cell.font = { bold: true };
       cell.numFmt = "#,##0.00;(#,##0.00);-";
       cell.alignment = { horizontal: "right" };
@@ -368,7 +365,14 @@ function buildTabla(
   }
 
   autosize(ws);
-  return { sheetName: ws.name, numericCols, rowCount: table.rows.length };
+  return {
+    sheetName: ws.name,
+    numericCols,
+    rowCount: table.rows.length,
+    startRow,
+    colCount,
+    totalRow: numericCols.length && table.rows.length > 1 ? startRow + 1 + table.rows.length : undefined,
+  };
 }
 
 function buildSupuestosYFinanzas(
