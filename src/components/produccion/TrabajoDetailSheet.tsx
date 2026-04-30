@@ -333,6 +333,13 @@ export function TrabajoDetailSheet({
                       }
                       Exportar Word
                     </Button>
+                    <Button variant="outline" onClick={handleExportarExcel} disabled={!!busy}>
+                      {busy === "xls"
+                        ? <Loader2 className="size-4 mr-2 animate-spin" />
+                        : <FileSpreadsheet className="size-4 mr-2" />
+                      }
+                      Exportar Excel
+                    </Button>
                   </div>
 
                   <div>
