@@ -379,6 +379,7 @@ function buildSupuestosYFinanzas(
   wb: ExcelJS.Workbook,
   input: ExcelExportInput,
   tablas: MarkdownTable[],
+  tableSheets: TableSheetInfo[],
 ) {
   const esFinanciero =
     /financ|econ[oó]mic|presupues|flujo|caja|balance|estado de resultad|inversi[oó]n|costos?/i.test(
@@ -393,8 +394,19 @@ function buildSupuestosYFinanzas(
   sup.getCell("A1").font = { bold: true, size: 14, color: { argb: COLOR_ACCENT } };
   sup.mergeCells("A1:C1");
 
-  const supuestos: Array<[string, number | string, string]> = [
-    ["Ingreso inicial (Año 1)", 100000, "Base usada para proyectar ingresos."],
+  const firstNumericTable = tableSheets.find((t) => t.rowCount > 0 && t.numericCols.some((c) => c > 0));
+  const firstNumericCol = firstNumericTable?.numericCols.find((c) => c > 0);
+  const linkedIngreso =
+    firstNumericTable && firstNumericCol != null
+      ? formula(
+          firstNumericTable.totalRow
+            ? cellRef(firstNumericTable.sheetName, `${sup.getColumn(firstNumericCol + 1).letter}${firstNumericTable.totalRow}`)
+            : cellRef(firstNumericTable.sheetName, `${sup.getColumn(firstNumericCol + 1).letter}${firstNumericTable.startRow + 1}`),
+        )
+      : 100000;
+
+  const supuestos: Array<[string, number | string | ExcelJS.CellFormulaValue, string]> = [
+    ["Ingreso inicial (Año 1)", linkedIngreso, firstNumericTable ? `Vinculado a ${firstNumericTable.sheetName}.` : "Base usada para proyectar ingresos."],
     ["Tasa de crecimiento anual", 0.08, "Crecimiento aplicado año a año (editable)."],
     ["Costo variable (% sobre ingreso)", 0.45, "Porcentaje de costos directos."],
     ["Costo fijo anual", 25000, "Costos que no varían con las ventas."],
@@ -411,6 +423,7 @@ function buildSupuestosYFinanzas(
     sup.getCell(r, 2).value = row[1];
     if (typeof row[1] === "number" && row[1] < 1 && row[1] > 0) sup.getCell(r, 2).numFmt = "0.00%";
     else if (typeof row[1] === "number") sup.getCell(r, 2).numFmt = "#,##0.00;(#,##0.00);-";
+    else if (typeof row[1] === "object" && row[1] && "formula" in row[1]) sup.getCell(r, 2).numFmt = "#,##0.00;(#,##0.00);-";
     sup.getCell(r, 2).font = { color: { argb: "FF1D4ED8" }, bold: true };
     sup.getCell(r, 2).fill = {
       type: "pattern",
@@ -423,24 +436,16 @@ function buildSupuestosYFinanzas(
   bordersAll(sup, 3, 1, 3 + supuestos.length, 3);
   sup.columns = [{ width: 38 }, { width: 16 }, { width: 60 }];
 
-  // Nombres con rango (para fórmulas legibles)
-  const nameMap: Record<string, string> = {
-    Ingreso_Inicial: "Supuestos!$B$4",
-    Crecimiento: "Supuestos!$B$5",
-    Costo_Variable_Pct: "Supuestos!$B$6",
-    Costo_Fijo: "Supuestos!$B$7",
-    Tasa_Impuestos: "Supuestos!$B$8",
-    Inversion_Inicial: "Supuestos!$B$9",
-    WACC: "Supuestos!$B$10",
-    Horizonte: "Supuestos!$B$11",
+  const S = quoteSheet(sup.name);
+  const refs = {
+    ingreso: `${S}!$B$4`,
+    crecimiento: `${S}!$B$5`,
+    costoVariable: `${S}!$B$6`,
+    costoFijo: `${S}!$B$7`,
+    impuestos: `${S}!$B$8`,
+    inversion: `${S}!$B$9`,
+    wacc: `${S}!$B$10`,
   };
-  Object.entries(nameMap).forEach(([n, ref]) => {
-    try {
-      wb.definedNames.add(ref, n);
-    } catch {
-      /* ignore */
-    }
-  });
 
   if (!esFinanciero) return;
 
