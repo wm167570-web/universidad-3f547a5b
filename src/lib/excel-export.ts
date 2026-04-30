@@ -28,6 +28,42 @@ type MarkdownTable = {
   rows: string[][];
 };
 
+type TableSheetInfo = {
+  sheetName: string;
+  numericCols: number[];
+  rowCount: number;
+  startRow: number;
+  colCount: number;
+  totalRow?: number;
+};
+
+const sanitizeSheetName = (raw: string | undefined, fallback: string) => {
+  const cleaned = stripInline(raw ?? fallback)
+    .replace(/[\\/?*\[\]:]/g, " ")
+    .replace(/^'+|'+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const base = cleaned && cleaned.toLowerCase() !== "history" ? cleaned : fallback;
+  return base.slice(0, 31).trim() || fallback;
+};
+
+const uniqueSheetName = (wb: ExcelJS.Workbook, raw: string | undefined, fallback: string) => {
+  const base = sanitizeSheetName(raw, fallback);
+  if (!wb.getWorksheet(base)) return base;
+  let n = 2;
+  while (n < 1000) {
+    const suffix = ` ${n}`;
+    const candidate = `${base.slice(0, 31 - suffix.length).trim()}${suffix}`;
+    if (!wb.getWorksheet(candidate)) return candidate;
+    n++;
+  }
+  return `Hoja ${Date.now()}`.slice(0, 31);
+};
+
+const quoteSheet = (sheetName: string) => `'${sheetName.replace(/'/g, "''")}'`;
+const cellRef = (sheetName: string, address: string) => `${quoteSheet(sheetName)}!${address}`;
+const formula = (value: string): ExcelJS.CellFormulaValue => ({ formula: value });
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Parsing
 // ──────────────────────────────────────────────────────────────────────────────
@@ -246,11 +282,8 @@ function buildTabla(
   wb: ExcelJS.Workbook,
   table: MarkdownTable,
   index: number,
-): { sheetName: string; numericCols: number[]; rowCount: number } {
-  const baseName = (table.titulo ?? `Tabla ${index + 1}`).slice(0, 28).replace(/[\\/\?\*\[\]:]/g, " ");
-  let name = baseName || `Tabla ${index + 1}`;
-  let n = 2;
-  while (wb.getWorksheet(name)) name = `${baseName} ${n++}`.slice(0, 31);
+): TableSheetInfo {
+  const name = uniqueSheetName(wb, table.titulo, `Tabla ${index + 1}`);
   const ws = wb.addWorksheet(name);
 
   // Título
@@ -313,7 +346,7 @@ function buildTabla(
       const fromRow = startRow + 1;
       const toRow = startRow + table.rows.length;
       const cell = ws.getCell(totalRowIdx, c + 1);
-      cell.value = { formula: `SUM(${colLetter}${fromRow}:${colLetter}${toRow})` } as any;
+      cell.value = formula(`SUM(${colLetter}${fromRow}:${colLetter}${toRow})`);
       cell.font = { bold: true };
       cell.numFmt = "#,##0.00;(#,##0.00);-";
       cell.alignment = { horizontal: "right" };
@@ -332,13 +365,21 @@ function buildTabla(
   }
 
   autosize(ws);
-  return { sheetName: ws.name, numericCols, rowCount: table.rows.length };
+  return {
+    sheetName: ws.name,
+    numericCols,
+    rowCount: table.rows.length,
+    startRow,
+    colCount,
+    totalRow: numericCols.length && table.rows.length > 1 ? startRow + 1 + table.rows.length : undefined,
+  };
 }
 
 function buildSupuestosYFinanzas(
   wb: ExcelJS.Workbook,
   input: ExcelExportInput,
   tablas: MarkdownTable[],
+  tableSheets: TableSheetInfo[],
 ) {
   const esFinanciero =
     /financ|econ[oó]mic|presupues|flujo|caja|balance|estado de resultad|inversi[oó]n|costos?/i.test(
@@ -353,8 +394,19 @@ function buildSupuestosYFinanzas(
   sup.getCell("A1").font = { bold: true, size: 14, color: { argb: COLOR_ACCENT } };
   sup.mergeCells("A1:C1");
 
-  const supuestos: Array<[string, number | string, string]> = [
-    ["Ingreso inicial (Año 1)", 100000, "Base usada para proyectar ingresos."],
+  const firstNumericTable = tableSheets.find((t) => t.rowCount > 0 && t.numericCols.some((c) => c > 0));
+  const firstNumericCol = firstNumericTable?.numericCols.find((c) => c > 0);
+  const linkedIngreso =
+    firstNumericTable && firstNumericCol != null
+      ? formula(
+          firstNumericTable.totalRow
+            ? cellRef(firstNumericTable.sheetName, `${sup.getColumn(firstNumericCol + 1).letter}${firstNumericTable.totalRow}`)
+            : cellRef(firstNumericTable.sheetName, `${sup.getColumn(firstNumericCol + 1).letter}${firstNumericTable.startRow + 1}`),
+        )
+      : 100000;
+
+  const supuestos: Array<[string, number | string | ExcelJS.CellFormulaValue, string]> = [
+    ["Ingreso inicial (Año 1)", linkedIngreso, firstNumericTable ? `Vinculado a ${firstNumericTable.sheetName}.` : "Base usada para proyectar ingresos."],
     ["Tasa de crecimiento anual", 0.08, "Crecimiento aplicado año a año (editable)."],
     ["Costo variable (% sobre ingreso)", 0.45, "Porcentaje de costos directos."],
     ["Costo fijo anual", 25000, "Costos que no varían con las ventas."],
@@ -371,6 +423,7 @@ function buildSupuestosYFinanzas(
     sup.getCell(r, 2).value = row[1];
     if (typeof row[1] === "number" && row[1] < 1 && row[1] > 0) sup.getCell(r, 2).numFmt = "0.00%";
     else if (typeof row[1] === "number") sup.getCell(r, 2).numFmt = "#,##0.00;(#,##0.00);-";
+    else if (typeof row[1] === "object" && row[1] && "formula" in row[1]) sup.getCell(r, 2).numFmt = "#,##0.00;(#,##0.00);-";
     sup.getCell(r, 2).font = { color: { argb: "FF1D4ED8" }, bold: true };
     sup.getCell(r, 2).fill = {
       type: "pattern",
@@ -383,24 +436,16 @@ function buildSupuestosYFinanzas(
   bordersAll(sup, 3, 1, 3 + supuestos.length, 3);
   sup.columns = [{ width: 38 }, { width: 16 }, { width: 60 }];
 
-  // Nombres con rango (para fórmulas legibles)
-  const nameMap: Record<string, string> = {
-    Ingreso_Inicial: "Supuestos!$B$4",
-    Crecimiento: "Supuestos!$B$5",
-    Costo_Variable_Pct: "Supuestos!$B$6",
-    Costo_Fijo: "Supuestos!$B$7",
-    Tasa_Impuestos: "Supuestos!$B$8",
-    Inversion_Inicial: "Supuestos!$B$9",
-    WACC: "Supuestos!$B$10",
-    Horizonte: "Supuestos!$B$11",
+  const S = quoteSheet(sup.name);
+  const refs = {
+    ingreso: `${S}!$B$4`,
+    crecimiento: `${S}!$B$5`,
+    costoVariable: `${S}!$B$6`,
+    costoFijo: `${S}!$B$7`,
+    impuestos: `${S}!$B$8`,
+    inversion: `${S}!$B$9`,
+    wacc: `${S}!$B$10`,
   };
-  Object.entries(nameMap).forEach(([n, ref]) => {
-    try {
-      wb.definedNames.add(ref, n);
-    } catch {
-      /* ignore */
-    }
-  });
 
   if (!esFinanciero) return;
 
@@ -417,21 +462,21 @@ function buildSupuestosYFinanzas(
   headers.forEach((h, i) => (fin.getCell(headerRow, i + 1).value = h));
   styleHeaderRow(fin.getRow(headerRow));
 
-  // Filas con fórmulas activas referenciando Supuestos
+  // Filas con fórmulas activas y referencias explícitas entre hojas.
   const conceptos: Array<{ label: string; formula: (col: string, prev?: string) => string; fmt?: string; bold?: boolean; fill?: string }> = [
     {
       label: "Ingresos",
-      formula: (col, prev) => (prev ? `${prev}*(1+Crecimiento)` : `Ingreso_Inicial`),
+      formula: (_col, prev) => (prev ? `${prev}4*(1+${refs.crecimiento})` : refs.ingreso),
       fmt: "$#,##0;($#,##0);-",
     },
     {
       label: "Costos variables",
-      formula: (col) => `-${col}4*Costo_Variable_Pct`,
+      formula: (col) => `-${col}4*${refs.costoVariable}`,
       fmt: "$#,##0;($#,##0);-",
     },
     {
       label: "Costos fijos",
-      formula: () => `-Costo_Fijo`,
+      formula: () => `-${refs.costoFijo}`,
       fmt: "$#,##0;($#,##0);-",
     },
     {
@@ -443,7 +488,7 @@ function buildSupuestosYFinanzas(
     },
     {
       label: "Impuestos",
-      formula: (col) => `IF(${col}7>0,-${col}7*Tasa_Impuestos,0)`,
+      formula: (col) => `IF(${col}7>0,-${col}7*${refs.impuestos},0)`,
       fmt: "$#,##0;($#,##0);-",
     },
     {
@@ -473,7 +518,7 @@ function buildSupuestosYFinanzas(
     cols.forEach((col, ci) => {
       const prev = ci > 0 ? cols[ci - 1] : undefined;
       const cell = fin.getCell(r, ci + 2);
-      cell.value = { formula: c.formula(col, prev) } as any;
+      cell.value = formula(c.formula(col, prev));
       if (c.fmt) cell.numFmt = c.fmt;
       if (c.bold) cell.font = { bold: true };
       if (c.fill)
@@ -486,17 +531,12 @@ function buildSupuestosYFinanzas(
   const vpnRow = headerRow + conceptos.length + 2;
   fin.getCell(vpnRow, 1).value = "VPN del flujo de caja";
   fin.getCell(vpnRow, 1).font = { bold: true };
-  fin.getCell(vpnRow, 2).value = {
-    formula: `-Inversion_Inicial+NPV(WACC,B${headerRow + 8}:F${headerRow + 8})`,
-  } as any;
+  fin.getCell(vpnRow, 2).value = formula(`-${refs.inversion}+NPV(${refs.wacc},B${headerRow + 8}:F${headerRow + 8})`);
   fin.getCell(vpnRow, 2).numFmt = "$#,##0;($#,##0);-";
   fin.getCell(vpnRow, 2).font = { bold: true, color: { argb: "FF059669" } };
 
   fin.getCell(vpnRow + 1, 1).value = "TIR";
   fin.getCell(vpnRow + 1, 1).font = { bold: true };
-  fin.getCell(vpnRow + 1, 2).value = {
-    formula: `IFERROR(IRR((-Inversion_Inicial,B${headerRow + 8},C${headerRow + 8},D${headerRow + 8},E${headerRow + 8},F${headerRow + 8})),0)`,
-  } as any;
   // IRR no acepta lista literal: usar rango auxiliar. Construimos uno en H.
   fin.getCell("H3").value = "Flujo descontable";
   fin.getCell("H3").font = { bold: true, color: { argb: COLOR_HEADER_TEXT } };
@@ -505,15 +545,13 @@ function buildSupuestosYFinanzas(
     pattern: "solid",
     fgColor: { argb: COLOR_HEADER },
   };
-  fin.getCell("H4").value = { formula: `-Inversion_Inicial` } as any;
+  fin.getCell("H4").value = formula(`-${refs.inversion}`);
   for (let i = 0; i < 5; i++) {
-    fin.getCell(`H${5 + i}`).value = {
-      formula: `${cols[i]}${headerRow + 8}`,
-    } as any;
+    fin.getCell(`H${5 + i}`).value = formula(`${cols[i]}${headerRow + 8}`);
     fin.getCell(`H${5 + i}`).numFmt = "$#,##0;($#,##0);-";
   }
   fin.getCell("H4").numFmt = "$#,##0;($#,##0);-";
-  fin.getCell(vpnRow + 1, 2).value = { formula: `IFERROR(IRR(H4:H9),0)` } as any;
+  fin.getCell(vpnRow + 1, 2).value = formula(`IFERROR(IRR(H4:H9),0)`);
   fin.getCell(vpnRow + 1, 2).numFmt = "0.00%";
   fin.getCell(vpnRow + 1, 2).font = { bold: true, color: { argb: "FF059669" } };
 
@@ -539,7 +577,7 @@ function buildSupuestosYFinanzas(
     fin.getCell(gRow + 1, i + 2).value = `Año ${i + 1}`;
     fin.getCell(gRow + 1, i + 2).font = { bold: true };
     fin.getCell(gRow + 1, i + 2).alignment = { horizontal: "center" };
-    fin.getCell(gRow + 2, i + 2).value = { formula: `${col}4` } as any;
+    fin.getCell(gRow + 2, i + 2).value = formula(`${col}4`);
     fin.getCell(gRow + 2, i + 2).numFmt = "$#,##0";
     fin.getCell(gRow + 2, i + 2).alignment = { horizontal: "center" };
   });
@@ -583,13 +621,14 @@ export async function exportarTrabajoExcel(input: ExcelExportInput): Promise<Blo
   const wb = new ExcelJS.Workbook();
   wb.creator = "AcadémicoPro";
   wb.created = new Date();
+  wb.calcProperties.fullCalcOnLoad = true;
 
   const tablas = extractTables(input.contenido);
 
   buildResumen(wb, input, tablas);
   buildContenido(wb, input);
-  tablas.forEach((t, i) => buildTabla(wb, t, i));
-  buildSupuestosYFinanzas(wb, input, tablas);
+  const tableSheets = tablas.map((t, i) => buildTabla(wb, t, i));
+  buildSupuestosYFinanzas(wb, input, tablas, tableSheets);
   buildBibliografia(wb, input.referencias ?? []);
 
   const buf = await wb.xlsx.writeBuffer();
