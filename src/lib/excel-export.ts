@@ -28,6 +28,42 @@ type MarkdownTable = {
   rows: string[][];
 };
 
+type TableSheetInfo = {
+  sheetName: string;
+  numericCols: number[];
+  rowCount: number;
+  startRow: number;
+  colCount: number;
+  totalRow?: number;
+};
+
+const sanitizeSheetName = (raw: string | undefined, fallback: string) => {
+  const cleaned = stripInline(raw ?? fallback)
+    .replace(/[\\/?*\[\]:]/g, " ")
+    .replace(/^'+|'+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const base = cleaned && cleaned.toLowerCase() !== "history" ? cleaned : fallback;
+  return base.slice(0, 31).trim() || fallback;
+};
+
+const uniqueSheetName = (wb: ExcelJS.Workbook, raw: string | undefined, fallback: string) => {
+  const base = sanitizeSheetName(raw, fallback);
+  if (!wb.getWorksheet(base)) return base;
+  let n = 2;
+  while (n < 1000) {
+    const suffix = ` ${n}`;
+    const candidate = `${base.slice(0, 31 - suffix.length).trim()}${suffix}`;
+    if (!wb.getWorksheet(candidate)) return candidate;
+    n++;
+  }
+  return `Hoja ${Date.now()}`.slice(0, 31);
+};
+
+const quoteSheet = (sheetName: string) => `'${sheetName.replace(/'/g, "''")}'`;
+const cellRef = (sheetName: string, address: string) => `${quoteSheet(sheetName)}!${address}`;
+const formula = (value: string): ExcelJS.CellFormulaValue => ({ formula: value });
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Parsing
 // ──────────────────────────────────────────────────────────────────────────────
