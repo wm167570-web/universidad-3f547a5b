@@ -190,15 +190,30 @@ export function TrabajoFormDialog({
             </div>
             <div>
               <Label>Descripción / contexto</Label>
-              <Textarea rows={2} value={v.descripcion} onChange={(e) => setV({ ...v, descripcion: e.target.value })} maxLength={1000} />
+              <Textarea
+                rows={2}
+                value={v.descripcion}
+                onChange={(e) => setV({ ...v, descripcion: e.target.value })}
+                className="max-h-32 overflow-y-auto resize-none"
+              />
             </div>
             <div>
               <Label>Instrucciones del docente</Label>
-              <Textarea rows={3} value={v.instrucciones} onChange={(e) => setV({ ...v, instrucciones: e.target.value })} maxLength={2000} />
+              <Textarea
+                rows={3}
+                value={v.instrucciones}
+                onChange={(e) => setV({ ...v, instrucciones: e.target.value })}
+                className="max-h-40 overflow-y-auto resize-none"
+              />
             </div>
             <div>
               <Label>Objetivos</Label>
-              <Textarea rows={2} value={v.objetivos} onChange={(e) => setV({ ...v, objetivos: e.target.value })} maxLength={1000} />
+              <Textarea
+                rows={2}
+                value={v.objetivos}
+                onChange={(e) => setV({ ...v, objetivos: e.target.value })}
+                className="max-h-32 overflow-y-auto resize-none"
+              />
             </div>
             <div>
               <Label>Palabras clave (separadas por coma)</Label>
