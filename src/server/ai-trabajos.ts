@@ -1,28 +1,38 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 async function callAI(messages: Array<{ role: string; content: string }>) {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY no configurada");
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY no configurada");
 
-  const res = await fetch(LOVABLE_AI_URL, {
+  // Convert OpenAI-style messages to Gemini format
+  const systemParts = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const contents = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+
+  const body: Record<string, unknown> = { contents };
+  if (systemParts) body.systemInstruction = { parts: [{ text: systemParts }] };
+
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: MODEL, messages }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 
-  if (res.status === 429) throw new Error("Límite de uso alcanzado. Intenta más tarde.");
-  if (res.status === 402) throw new Error("Créditos de IA agotados. Recarga tu workspace.");
-  if (!res.ok) throw new Error(`Error IA (${res.status}): ${await res.text()}`);
+  if (res.status === 429) throw new Error("Límite de uso de Gemini alcanzado. Intenta más tarde.");
+  if (res.status === 401 || res.status === 403) throw new Error("API key de Gemini inválida o sin permisos.");
+  if (!res.ok) throw new Error(`Error Gemini (${res.status}): ${await res.text()}`);
 
   const json = await res.json();
-  return json.choices?.[0]?.message?.content ?? "";
+  const text = json.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+  return text;
 }
 
 type GenInput = {
