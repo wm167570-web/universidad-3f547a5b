@@ -1,10 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   LayoutDashboard, BookOpen, FileText, Microscope,
-  LogOut, GraduationCap, Zap, Shield
+  LogOut, GraduationCap, Zap, Shield, Menu
 } from "lucide-react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; disabled?: boolean };
 
@@ -15,20 +17,12 @@ const NAV: NavItem[] = [
   { to: "/tesis", label: "Tesis", icon: Microscope },
 ];
 
-export function AppSidebar() {
+function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
   const { pathname } = useLocation();
   const { user, role, signOut } = useAuth();
 
   return (
-    <aside
-      className="hidden md:flex w-64 flex-col border-r"
-      style={{
-        background: "rgba(15, 2, 2, 0.90)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderRightColor: "rgba(245, 158, 11, 0.2)",
-      }}
-    >
+    <div className="flex flex-col h-full">
       {/* ── Logo ── */}
       <div className="px-5 py-5 border-b" style={{ borderColor: "rgba(245, 158, 11, 0.15)" }}>
         <div className="flex items-center gap-3">
@@ -57,7 +51,6 @@ export function AppSidebar() {
 
       {/* ── Navegación ── */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {/* Etiqueta sección */}
         <p className="text-[10px] uppercase tracking-widest px-3 pb-2 pt-1"
           style={{ color: "rgba(212, 165, 116, 0.5)" }}>
           Módulos
@@ -90,6 +83,7 @@ export function AppSidebar() {
             <Link
               key={to}
               to={to}
+              onClick={onNavigate}
               className="flex items-center gap-3 px-3 py-2.5 rounded text-xs uppercase tracking-wider transition-all group"
               style={
                 active
@@ -116,7 +110,7 @@ export function AppSidebar() {
             </Link>
           );
         })}
-        {/* Sección Admin */}
+
         {role === "admin" && (
           <>
             <p className="text-[10px] uppercase tracking-widest px-3 pb-2 pt-4"
@@ -125,6 +119,7 @@ export function AppSidebar() {
             </p>
             <Link
               to="/admin"
+              onClick={onNavigate}
               className="flex items-center gap-3 px-3 py-2.5 rounded text-xs uppercase tracking-wider transition-all group"
               style={
                 pathname === "/admin"
@@ -146,7 +141,6 @@ export function AppSidebar() {
         )}
       </nav>
 
-      {/* ── Usuario / Cierre de sesión ── */}
       <div className="p-3 border-t" style={{ borderColor: "rgba(245, 158, 11, 0.12)" }}>
         <div
           className="px-3 py-2 mb-2 rounded"
@@ -175,6 +169,60 @@ export function AppSidebar() {
           Cerrar sesión
         </Button>
       </div>
-    </aside>
+    </div>
+  );
+}
+
+const sidebarSurface: CSSProperties = {
+  background: "rgba(15, 2, 2, 0.95)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  borderColor: "rgba(245, 158, 11, 0.2)",
+};
+
+export function AppSidebar() {
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
+
+  // Cerrar el sheet al cambiar de ruta
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  return (
+    <>
+      {/* Desktop */}
+      <aside
+        className="hidden md:flex w-64 flex-col border-r"
+        style={sidebarSurface}
+      >
+        <SidebarInner />
+      </aside>
+
+      {/* Mobile: trigger flotante + Sheet */}
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <button
+            type="button"
+            aria-label="Abrir menú"
+            className="md:hidden fixed top-3 left-3 z-50 flex items-center justify-center size-10 rounded-md border shadow-lg"
+            style={{
+              background: "rgba(15, 2, 2, 0.92)",
+              borderColor: "rgba(245, 158, 11, 0.35)",
+              color: "#fbbf24",
+            }}
+          >
+            <Menu className="size-5" />
+          </button>
+        </SheetTrigger>
+        <SheetContent
+          side="left"
+          className="p-0 w-72 border-r"
+          style={sidebarSurface}
+        >
+          <SidebarInner onNavigate={() => setOpen(false)} />
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
