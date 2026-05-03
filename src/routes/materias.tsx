@@ -129,10 +129,10 @@ function MateriasPage() {
       <AppSidebar />
 
       {/* Layout master-detail de dos columnas */}
-      <div className="flex-1 flex overflow-hidden h-screen">
+      <div className="flex-1 flex overflow-hidden h-screen w-full min-w-0">
 
-        {/* Columna izquierda: Lista de materias */}
-        <div className="w-72 shrink-0 flex flex-col overflow-hidden border-r border-border">
+        {/* Columna izquierda: Lista de materias (oculta en móvil cuando hay selección) */}
+        <div className={`${selectedMateria ? "hidden md:flex" : "flex"} w-full md:w-72 shrink-0 flex-col overflow-hidden border-r border-border pt-12 md:pt-0`}>
           <div className="px-4 pt-6 pb-2">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Tu semestre</p>
             <h1 className="font-serif text-2xl mt-0.5">Gestión Académica</h1>
@@ -154,9 +154,22 @@ function MateriasPage() {
         </div>
 
         {/* Columna derecha: Detalle de la materia seleccionada */}
-        <div className="flex-1 overflow-hidden">
+        <div className={`${selectedMateria ? "flex" : "hidden md:flex"} flex-1 min-w-0 overflow-hidden flex-col`}>
           {selectedMateria ? (
-            <MateriaDetailPanel materia={selectedMateria} />
+            <>
+              {/* Botón volver (solo móvil) */}
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                className="md:hidden flex items-center gap-2 px-4 py-3 text-xs uppercase tracking-wider border-b"
+                style={{ color: "#fbbf24", borderColor: "rgba(245,158,11,0.2)" }}
+              >
+                ← Volver a materias
+              </button>
+              <div className="flex-1 overflow-hidden">
+                <MateriaDetailPanel materia={selectedMateria} />
+              </div>
+            </>
           ) : (
             // Estado vacío cuando no hay materias
             <div className="flex flex-col items-center justify-center h-full text-center px-6">
