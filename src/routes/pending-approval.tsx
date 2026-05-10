@@ -1,7 +1,10 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Clock, LogOut } from "lucide-react";
+import { GraduationCap, Clock, LogOut, Send, ShieldX, CheckCircle2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/pending-approval")({
   component: PendingApproval,
@@ -9,16 +12,52 @@ export const Route = createFileRoute("/pending-approval")({
 
 function PendingApproval() {
   const { user, profile, signOut, loading } = useAuth();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [requested, setRequested] = useState(false);
 
   if (loading) return null;
+  if (!user) return <Navigate to="/login" />;
+  if (profile?.is_approved) return <Navigate to="/dashboard" />;
 
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
+  const handleRequest = async () => {
+    setBusy(true);
+    try {
+      // Asegurar registro de perfil en estado PENDIENTE (is_approved = false)
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            user_id: user.id,
+            display_name:
+              (user.user_metadata as any)?.full_name ||
+              (user.user_metadata as any)?.name ||
+              user.email?.split("@")[0],
+            is_approved: false,
+          },
+          { onConflict: "user_id" }
+        );
+      if (error) throw error;
+      setRequested(true);
+      toast.success("Solicitud enviada al administrador");
+    } catch (err: any) {
+      toast.error("No se pudo enviar la solicitud: " + err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  if (profile?.is_approved) {
-    return <Navigate to="/dashboard" />;
-  }
+  const handleDeny = async () => {
+    setBusy(true);
+    await signOut();
+    toast.message("Sesión cerrada");
+    // Salida inmediata fuera de la app
+    if (typeof window !== "undefined") {
+      window.location.replace("https://www.google.com");
+    } else {
+      navigate({ to: "/login" });
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#1a0505] p-4 font-sans text-foreground">
@@ -42,7 +81,7 @@ function PendingApproval() {
           </h1>
         </div>
 
-        {/* Status Card */}
+        {/* Card */}
         <div
           className="p-8 rounded-2xl border"
           style={{
@@ -53,28 +92,69 @@ function PendingApproval() {
           }}
         >
           <div className="flex justify-center mb-6 text-[#f59e0b]">
-            <div className="p-4 rounded-full bg-[#f59e0b]/10 animate-pulse">
-              <Clock className="size-12" />
+            <div className="p-4 rounded-full bg-[#f59e0b]/10">
+              {requested ? (
+                <CheckCircle2 className="size-12 text-green-400" />
+              ) : (
+                <Clock className="size-12 animate-pulse" />
+              )}
             </div>
           </div>
-          <h2 className="text-xl font-semibold mb-3 text-[#fbbf24]">Acceso en espera</h2>
+
+          <h2 className="text-xl font-semibold mb-3 text-[#fbbf24]">
+            {requested ? "Solicitud enviada" : "Solicitar permiso de acceso"}
+          </h2>
           <p className="text-sm text-[#d4a574]/70 mb-6 leading-relaxed">
-            Hola <span className="text-[#fbbf24] font-medium">{user.email}</span>. 
-            Tu solicitud de acceso está en espera. Por favor, solicita autorización directamente al propietario del sistema en <a href="mailto:wmartinezm360@gmail.com" className="text-[#f59e0b] hover:underline font-medium">wmartinezm360@gmail.com</a>.
+            {requested ? (
+              <>
+                Hemos notificado al administrador. Recibirás acceso una vez sea aprobada tu cuenta{" "}
+                <span className="text-[#fbbf24] font-medium">{user.email}</span>.
+              </>
+            ) : (
+              <>
+                Tu correo <span className="text-[#fbbf24] font-medium">{user.email}</span> aún no
+                tiene autorización. Envía una solicitud al administrador o sal de la aplicación.
+              </>
+            )}
           </p>
-          
-          <Button
-            variant="outline"
-            className="w-full border-[#f59e0b]/30 hover:bg-[#f59e0b]/10 text-[#f59e0b] transition-all"
-            onClick={() => signOut()}
-          >
-            <LogOut className="size-4 mr-2" />
-            Cerrar sesión
-          </Button>
+
+          {!requested ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-[#1a0505] hover:opacity-90 font-semibold"
+                onClick={handleRequest}
+                disabled={busy}
+              >
+                {busy ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Send className="size-4 mr-2" />}
+                Solicitar permiso
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-destructive/40 hover:bg-destructive/10 text-destructive"
+                onClick={handleDeny}
+                disabled={busy}
+              >
+                <ShieldX className="size-4 mr-2" />
+                Denegar permiso
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full border-[#f59e0b]/30 hover:bg-[#f59e0b]/10 text-[#f59e0b]"
+              onClick={() => signOut()}
+            >
+              <LogOut className="size-4 mr-2" />
+              Cerrar sesión
+            </Button>
+          )}
         </div>
 
         <p className="text-xs text-[#d4a574]/40 italic">
-          Si eres el propietario, asegúrate de estar usando el correo principal.
+          Contacto del administrador:{" "}
+          <a href="mailto:wmartinezm360@gmail.com" className="text-[#f59e0b] hover:underline">
+            wmartinezm360@gmail.com
+          </a>
         </p>
       </div>
     </div>
