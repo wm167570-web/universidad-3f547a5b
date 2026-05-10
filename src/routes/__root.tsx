@@ -84,13 +84,11 @@ function RealtimeSync() {
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, role, loading } = useAuth();
+  const { user, profile, role, loading } = useAuth();
   const navigate = useNavigate();
   const { location } = useRouterState();
   const [fallbackTimeout, setFallbackTimeout] = useState(false);
 
-  // Si la carga toma más de 3.5s, dejamos pasar al contenido (con skeletons)
-  // para evitar el spinner infinito si el perfil/rol no resuelve.
   useEffect(() => {
     if (!loading) {
       setFallbackTimeout(false);
@@ -103,18 +101,33 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const isAuthPage = location.pathname === "/login";
+    const path = location.pathname;
+    const isAuthPage = path === "/login";
+    const isPending = path === "/pending-approval";
 
-    if (!user && !isAuthPage) {
-      navigate({ to: "/login" });
+    if (!user) {
+      if (!isAuthPage) navigate({ to: "/login" });
       return;
     }
 
-    if (user && !role && !isAuthPage) {
-      navigate({ to: "/login" });
+    // Usuario logueado pero NO aprobado → solo pantalla de solicitud
+    if (profile && profile.is_approved === false) {
+      if (!isPending) navigate({ to: "/pending-approval" });
       return;
     }
-  }, [user, role, loading, location.pathname, navigate]);
+
+    // Aprobado en pantalla de pending → al dashboard
+    if (profile?.is_approved && (isPending || isAuthPage)) {
+      navigate({ to: "/dashboard" });
+      return;
+    }
+
+    // Bloqueo del módulo admin para no-admins
+    if (path.startsWith("/admin") && role !== "admin") {
+      navigate({ to: "/dashboard" });
+      return;
+    }
+  }, [user, profile, role, loading, location.pathname, navigate]);
 
   const isAuthPage = location.pathname === "/login";
 
