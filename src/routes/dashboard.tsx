@@ -6,7 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Trophy, Clock, AlertTriangle, CheckCircle, RefreshCw, Video, ExternalLink } from "lucide-react";
+import { BookOpen, Trophy, Clock, AlertTriangle, CheckCircle, RefreshCw, Video, ExternalLink, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,6 +39,68 @@ function DashboardPage() {
     setTimeout(() => setIsSyncing(false), 600); // Efecto visual
   };
 
+
+  const handleExport = async () => {
+    try {
+      toast.loading("Generando Excel...", { id: "export" });
+      const [matRes, trabRes] = await Promise.all([
+        supabase.from("materias").select("*"),
+        supabase.from("trabajos").select("*"),
+      ]);
+      if (matRes.error) throw matRes.error;
+      if (trabRes.error) throw trabRes.error;
+
+      const matMap = new Map((matRes.data ?? []).map((m: any) => [m.id, m.nombre]));
+
+      const wsMaterias = XLSX.utils.json_to_sheet(
+        (matRes.data ?? []).map((m: any) => ({
+          Código: m.codigo ?? "",
+          Nombre: m.nombre,
+          Docente: m.docente ?? "",
+          Créditos: m.creditos ?? "",
+          Semestre: m.semestre ?? "",
+          Estado: m.estado,
+          Descripción: m.descripcion ?? "",
+        }))
+      );
+
+      const wsNotas = XLSX.utils.json_to_sheet(
+        (trabRes.data ?? []).map((t: any) => ({
+          Materia: matMap.get(t.materia_id) ?? "Sin materia",
+          Título: t.titulo,
+          Tipo: t.tipo,
+          Estado: t.estado,
+          Peso: t.peso ?? "",
+          Nota: t.nota ?? "",
+          "Fecha entrega": t.fecha_entrega ?? "",
+        }))
+      );
+
+      const wsProduccion = XLSX.utils.json_to_sheet(
+        (trabRes.data ?? []).map((t: any) => ({
+          Título: t.titulo,
+          Materia: matMap.get(t.materia_id) ?? "Sin materia",
+          Tipo: t.tipo,
+          "Tipo actividad": t.tipo_actividad ?? "",
+          Trayecto: t.trayecto ?? "",
+          Estado: t.estado,
+          "Páginas estimadas": t.paginas_estimadas ?? "",
+          "Fecha entrega": t.fecha_entrega ?? "",
+          "Fecha real": t.entrega_fecha_real ?? "",
+          Medio: t.entrega_medio ?? "",
+        }))
+      );
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsMaterias, "Gestión Académica");
+      XLSX.utils.book_append_sheet(wb, wsNotas, "Notas");
+      XLSX.utils.book_append_sheet(wb, wsProduccion, "Proyectos de Inversión");
+      XLSX.writeFile(wb, `AcademicoPro_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success("Excel generado", { id: "export" });
+    } catch (e: any) {
+      toast.error(e.message ?? "Error al exportar", { id: "export" });
+    }
+  };
 
   // Sincronización automática al montar el componente
   useEffect(() => {
@@ -119,19 +183,37 @@ function DashboardPage() {
 
   return (
     <AppShell>
-      <header className="mb-8 flex items-end justify-between">
+      <header className="mb-8 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <p className="text-sm text-muted-foreground">Hola de nuevo,</p>
           <h1 className="font-serif text-3xl md:text-4xl mt-1">Tu panel académico</h1>
         </div>
-        <button 
-          onClick={handleSync}
-          disabled={isSyncing}
-          className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-          {isSyncing ? "Sincronizando..." : "Sincronizar"}
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div
+            className="px-4 py-2 rounded-full border border-amber-400/30 bg-gradient-to-r from-amber-500/10 via-yellow-300/5 to-amber-500/10 shadow-[0_0_20px_-8px_rgba(251,191,36,0.5)]"
+            style={{ fontFamily: "'Montserrat', 'Poppins', system-ui, sans-serif" }}
+          >
+            <span className="text-[11px] uppercase tracking-[0.18em] font-semibold bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-300 bg-clip-text text-transparent">
+              Created By Ing. William Martínez
+            </span>
+          </div>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full bg-emerald-600/15 text-emerald-300 hover:bg-emerald-600/25 border border-emerald-500/30 transition-colors"
+            title="Exportar a Excel"
+          >
+            <FileSpreadsheet className="size-3.5" />
+            Excel
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Sincronizando..." : "Sincronizar"}
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
