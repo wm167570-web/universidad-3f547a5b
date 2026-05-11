@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +41,7 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
   const [isUploading, setIsUploading] = useState(false);
 
   const { data: trabajos = [], isLoading } = useQuery({
+    enabled: !!materiaId,
     queryKey: ["materia-notas", materiaId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -51,7 +52,28 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
       if (error) throw error;
       return (data ?? []) as NotaRow[];
     },
+    refetchOnMount: "always",
+    staleTime: 0,
   });
+
+  // Forzar refetch inmediato y suscripción realtime al cambiar de materia
+  useEffect(() => {
+    if (!materiaId) return;
+    qc.invalidateQueries({ queryKey: ["materia-notas", materiaId] });
+
+    const channel = supabase
+      .channel(`materia-notas-${materiaId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trabajos", filter: `materia_id=eq.${materiaId}` },
+        () => qc.invalidateQueries({ queryKey: ["materia-notas", materiaId] })
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [materiaId, qc]);
 
   const save = useMutation({
     mutationFn: async () => {
