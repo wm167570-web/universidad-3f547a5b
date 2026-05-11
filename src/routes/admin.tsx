@@ -24,6 +24,8 @@ function AdminPanel() {
   const { user, role, profile, loading } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const isSuperAdmin = user?.email === "wmartinezm360@gmail.com";
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
