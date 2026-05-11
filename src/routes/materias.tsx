@@ -34,6 +34,7 @@ export const Route = createFileRoute("/materias")({
 function MateriasPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const searchParams = Route.useSearch();
   const selectedId = searchParams.selected || null;
   const setSelectedId = (id: string | null) => navigate({ to: "/materias", search: (p: { selected?: string }) => ({ ...p, selected: id || undefined }) });
