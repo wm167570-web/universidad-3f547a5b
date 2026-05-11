@@ -70,6 +70,27 @@ function AdminPanel() {
     onError: (err: any) => toast.error("Error: " + err.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.from("profiles").delete().eq("user_id", userId);
+      if (error) throw error;
+    },
+    onMutate: async (userId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+      const prev = queryClient.getQueryData<any[]>(["admin-users"]);
+      queryClient.setQueryData<any[]>(["admin-users"], (old) =>
+        (old || []).filter((u) => u.user_id !== userId)
+      );
+      return { prev };
+    },
+    onError: (err: any, _id, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["admin-users"], ctx.prev);
+      toast.error("Error: " + err.message);
+    },
+    onSuccess: () => toast.success("Usuario eliminado permanentemente"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+  });
+
   if (loading || isLoading) return null;
 
   if (!user || role !== "admin") {
