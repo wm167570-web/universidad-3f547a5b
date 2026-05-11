@@ -4,13 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { 
-  Users, Check, X, Shield, 
+  Users, Check, X, Shield, Trash2,
   UserCheck, AlertCircle, Search, Mail
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { AppSidebar } from "@/components/AppSidebar";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPanel,
@@ -20,6 +24,8 @@ function AdminPanel() {
   const { user, role, profile, loading } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const isSuperAdmin = user?.email === "wmartinezm360@gmail.com";
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -62,6 +68,27 @@ function AdminPanel() {
       toast.success("Acceso revocado");
     },
     onError: (err: any) => toast.error("Error: " + err.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.from("profiles").delete().eq("user_id", userId);
+      if (error) throw error;
+    },
+    onMutate: async (userId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+      const prev = queryClient.getQueryData<any[]>(["admin-users"]);
+      queryClient.setQueryData<any[]>(["admin-users"], (old) =>
+        (old || []).filter((u) => u.user_id !== userId)
+      );
+      return { prev };
+    },
+    onError: (err: any, _id, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["admin-users"], ctx.prev);
+      toast.error("Error: " + err.message);
+    },
+    onSuccess: () => toast.success("Usuario eliminado permanentemente"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
   if (loading || isLoading) return null;
@@ -193,6 +220,18 @@ function AdminPanel() {
                             <Check className="size-4" />
                           </Button>
                         )}
+                        {isSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
+                            onClick={() => setConfirmDeleteId(u.user_id)}
+                            disabled={deleteMutation.isPending}
+                            title="Eliminar permanentemente"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -202,6 +241,29 @@ function AdminPanel() {
           </div>
         </div>
       </main>
+
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este usuario permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El registro del perfil será eliminado de la base de datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                if (confirmDeleteId) deleteMutation.mutate(confirmDeleteId);
+                setConfirmDeleteId(null);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
