@@ -184,7 +184,7 @@ function DashboardPage() {
   return (
     <AppShell>
       <header className="mb-8 flex items-end justify-between gap-4 flex-wrap">
-        <div>
+        <div className="pl-12 md:pl-0">
           <p className="text-sm text-muted-foreground">Hola de nuevo,</p>
           <h1 className="font-serif text-3xl md:text-4xl mt-1">Tu panel académico</h1>
         </div>
