@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { BookOpen } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { MateriaSidebar } from "@/components/materias/MateriaSidebar";
 import { MateriaDetailPanel } from "@/components/materias/MateriaDetailPanel";
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/materias")({
 function MateriasPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const searchParams = Route.useSearch();
   const selectedId = searchParams.selected || null;
   const setSelectedId = (id: string | null) => navigate({ to: "/materias", search: (p: { selected?: string }) => ({ ...p, selected: id || undefined }) });
@@ -71,12 +73,12 @@ function MateriasPage() {
     },
   });
 
-  // Autoselección de la primera materia al cargar
+  // Autoselección de la primera materia al cargar (solo en escritorio)
   useEffect(() => {
-    if (materias.length > 0 && !selectedId) {
+    if (!isMobile && materias.length > 0 && !selectedId) {
       setSelectedId(materias[0].id);
     }
-  }, [materias, selectedId]);
+  }, [materias, selectedId, isMobile]);
 
   // Cargar trabajos para calcular el progreso visual de cada materia
   const { data: trabajosMateria = [] } = useQuery({
