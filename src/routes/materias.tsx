@@ -73,12 +73,12 @@ function MateriasPage() {
     },
   });
 
-  // Autoselección de la primera materia al cargar
+  // Autoselección de la primera materia al cargar (solo en escritorio)
   useEffect(() => {
-    if (materias.length > 0 && !selectedId) {
+    if (!isMobile && materias.length > 0 && !selectedId) {
       setSelectedId(materias[0].id);
     }
-  }, [materias, selectedId]);
+  }, [materias, selectedId, isMobile]);
 
   // Cargar trabajos para calcular el progreso visual de cada materia
   const { data: trabajosMateria = [] } = useQuery({
