@@ -220,6 +220,18 @@ function AdminPanel() {
                             <Check className="size-4" />
                           </Button>
                         )}
+                        {isSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
+                            onClick={() => setConfirmDeleteId(u.user_id)}
+                            disabled={deleteMutation.isPending}
+                            title="Eliminar permanentemente"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -229,6 +241,29 @@ function AdminPanel() {
           </div>
         </div>
       </main>
+
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este usuario permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El registro del perfil será eliminado de la base de datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                if (confirmDeleteId) deleteMutation.mutate(confirmDeleteId);
+                setConfirmDeleteId(null);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
