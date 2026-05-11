@@ -183,19 +183,37 @@ function DashboardPage() {
 
   return (
     <AppShell>
-      <header className="mb-8 flex items-end justify-between">
+      <header className="mb-8 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <p className="text-sm text-muted-foreground">Hola de nuevo,</p>
           <h1 className="font-serif text-3xl md:text-4xl mt-1">Tu panel académico</h1>
         </div>
-        <button 
-          onClick={handleSync}
-          disabled={isSyncing}
-          className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-          {isSyncing ? "Sincronizando..." : "Sincronizar"}
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div
+            className="px-4 py-2 rounded-full border border-amber-400/30 bg-gradient-to-r from-amber-500/10 via-yellow-300/5 to-amber-500/10 shadow-[0_0_20px_-8px_rgba(251,191,36,0.5)]"
+            style={{ fontFamily: "'Montserrat', 'Poppins', system-ui, sans-serif" }}
+          >
+            <span className="text-[11px] uppercase tracking-[0.18em] font-semibold bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-300 bg-clip-text text-transparent">
+              Created By Ing. William Martínez
+            </span>
+          </div>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full bg-emerald-600/15 text-emerald-300 hover:bg-emerald-600/25 border border-emerald-500/30 transition-colors"
+            title="Exportar a Excel"
+          >
+            <FileSpreadsheet className="size-3.5" />
+            Excel
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Sincronizando..." : "Sincronizar"}
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
