@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { BookOpen } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { MateriaSidebar } from "@/components/materias/MateriaSidebar";
 import { MateriaDetailPanel } from "@/components/materias/MateriaDetailPanel";
