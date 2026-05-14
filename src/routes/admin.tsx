@@ -158,6 +158,7 @@ function AdminPanel() {
                   <th className="px-6 py-4 font-medium">Programa/Semestre</th>
                   <th className="px-6 py-4 font-medium">Fecha Registro</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
+                  <th className="px-6 py-4 font-medium">Créditos IA</th>
                   <th className="px-6 py-4 font-medium text-right">Acciones</th>
                 </tr>
               </thead>
@@ -195,6 +196,20 @@ function AdminPanel() {
                         <span className="inline-flex items-center px-2 py-1 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wider border border-amber-500/20">
                           Pendiente
                         </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {u.is_approved ? (
+                        <div className="flex flex-col gap-0.5 text-xs">
+                          <span className="font-mono text-emerald-400">
+                            {u.creditos_disponibles ?? 0} <span className="text-muted-foreground">disp.</span>
+                          </span>
+                          <span className="font-mono text-muted-foreground">
+                            {u.creditos_usados ?? 0} usados
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
