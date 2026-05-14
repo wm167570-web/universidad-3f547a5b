@@ -198,6 +198,20 @@ function AdminPanel() {
                         </span>
                       )}
                     </td>
+                    <td className="px-6 py-4">
+                      {u.is_approved ? (
+                        <div className="flex flex-col gap-0.5 text-xs">
+                          <span className="font-mono text-emerald-400">
+                            {u.creditos_disponibles ?? 0} <span className="text-muted-foreground">disp.</span>
+                          </span>
+                          <span className="font-mono text-muted-foreground">
+                            {u.creditos_usados ?? 0} usados
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         {u.is_approved ? (
