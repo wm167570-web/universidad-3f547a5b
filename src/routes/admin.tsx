@@ -70,6 +70,30 @@ function AdminPanel() {
     onError: (err: any) => toast.error("Error: " + err.message),
   });
 
+  const updateCreditsMutation = useMutation({
+    mutationFn: async ({ userId, value }: { userId: string; value: number }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ creditos_disponibles: value })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onMutate: async ({ userId, value }) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+      const prev = queryClient.getQueryData<any[]>(["admin-users"]);
+      queryClient.setQueryData<any[]>(["admin-users"], (old) =>
+        (old || []).map((u) => (u.user_id === userId ? { ...u, creditos_disponibles: value } : u))
+      );
+      return { prev };
+    },
+    onError: (err: any, _v, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["admin-users"], ctx.prev);
+      toast.error("Error: " + err.message);
+    },
+    onSuccess: () => toast.success("Créditos actualizados"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
       const { error } = await supabase.from("profiles").delete().eq("user_id", userId);
