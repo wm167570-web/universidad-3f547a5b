@@ -1,13 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Video, Calendar, Clock, ExternalLink, PlayCircle, Users, Plus, Trash2, Link as LinkIcon, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 
 type Encuentro = {
@@ -45,120 +38,74 @@ const checkEsPasado = (fecha: string, hora: string) => {
 
 export function EncuentrosTab({ materiaId }: { materiaId: string }) {
   const { user } = useAuth();
-  const [encuentros, setEncuentros] = useState<Encuentro[]>([]);
+  const qc = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEncuentro, setEditingEncuentro] = useState<Encuentro | null>(null);
   
   const [formData, setFormData] = useState({
-    fecha: "",
-    hora: "",
-    tematica: "",
-    plataforma: "Teams",
-    link: "",
-    linkGrabacion: ""
+    fecha: "", hora: "", tematica: "", plataforma: "Teams", link: "", linkGrabacion: ""
   });
 
-  // Cargar desde localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const allEncuentros = JSON.parse(saved);
-        // Filtrar por materiaId
-        const filtered = allEncuentros.filter((e: any) => e.materiaId === materiaId);
-        setEncuentros(filtered);
-      } catch (e) {
-        console.error("Error parsing encuentros", e);
+  const { data: encuentros = [], isLoading } = useQuery({
+    enabled: !!user && !!materiaId,
+    queryKey: ["materia-encuentros", materiaId],
+    queryFn: async () => {
+      const q = query(collection(db, "materia_encuentros"), where("materiaId", "==", materiaId), orderBy("fecha", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Encuentro[];
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        ...formData,
+        materiaId,
+        user_id: user?.uid,
+        estado: checkEsPasado(formData.fecha, formData.hora) ? "grabado" : "programado",
+        updated_at: new Date().toISOString(),
+      };
+      if (editingEncuentro) {
+        await updateDoc(doc(db, "materia_encuentros", editingEncuentro.id), payload);
+      } else {
+        await addDoc(collection(db, "materia_encuentros"), {
+          ...payload,
+          created_at: new Date().toISOString(),
+        });
       }
-    }
-  }, [materiaId]);
+    },
+    onSuccess: () => {
+      toast.success(editingEncuentro ? "Encuentro actualizado" : "Encuentro programado");
+      qc.invalidateQueries({ queryKey: ["materia-encuentros", materiaId] });
+      setIsDialogOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
-  // Efecto para actualizar los estados automáticamente cada minuto
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const saveToStorage = (updatedEncuentros: Encuentro[]) => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    let allEncuentros = [];
-    if (saved) {
-      try {
-        allEncuentros = JSON.parse(saved);
-      } catch (e) {}
-    }
-    
-    // Remover los de esta materia y agregar los nuevos
-    const otherEncuentros = allEncuentros.filter((e: any) => e.materiaId !== materiaId);
-    const withMateriaId = updatedEncuentros.map(e => ({ ...e, materiaId }));
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...otherEncuentros, ...withMateriaId]));
-  };
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await deleteDoc(doc(db, "materia_encuentros", id));
+    },
+    onSuccess: () => {
+      toast.success("Encuentro eliminado");
+      qc.invalidateQueries({ queryKey: ["materia-encuentros", materiaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const handleOpenAdd = () => {
     setEditingEncuentro(null);
-    setFormData({
-      fecha: "",
-      hora: "",
-      tematica: "",
-      plataforma: "Teams",
-      link: "",
-      linkGrabacion: ""
-    });
+    setFormData({ fecha: "", hora: "", tematica: "", plataforma: "Teams", link: "", linkGrabacion: "" });
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (encuentro: Encuentro) => {
     setEditingEncuentro(encuentro);
     setFormData({
-      fecha: encuentro.fecha,
-      hora: encuentro.hora,
-      tematica: encuentro.tematica,
-      plataforma: encuentro.plataforma,
-      link: encuentro.link || "",
-      linkGrabacion: encuentro.linkGrabacion || ""
+      fecha: encuentro.fecha, hora: encuentro.hora, tematica: encuentro.tematica,
+      plataforma: encuentro.plataforma, link: encuentro.link || "", linkGrabacion: encuentro.linkGrabacion || ""
     });
     setIsDialogOpen(true);
-  };
-
-  const handleSave = () => {
-    if (!formData.fecha || !formData.tematica) {
-      toast.error("Por favor completa los campos obligatorios");
-      return;
-    }
-
-    let updated: Encuentro[];
-
-    if (editingEncuentro) {
-      updated = encuentros.map(e => 
-        e.id === editingEncuentro.id 
-          ? { ...e, ...formData, estado: checkEsPasado(formData.fecha, formData.hora) ? "grabado" : "programado" } 
-          : e
-      );
-      toast.success("Encuentro actualizado correctamente");
-    } else {
-      const encuentro: Encuentro = {
-        id: Math.random().toString(36).substr(2, 9),
-        ...formData,
-        estado: checkEsPasado(formData.fecha, formData.hora) ? "grabado" : "programado"
-      };
-      updated = [encuentro, ...encuentros];
-      toast.success("Encuentro programado correctamente");
-    }
-
-    setEncuentros(updated);
-    saveToStorage(updated);
-    setIsDialogOpen(false);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm("¿Estás seguro de eliminar este encuentro?")) {
-      const updated = encuentros.filter(e => e.id !== id);
-      setEncuentros(updated);
-      saveToStorage(updated);
-      toast.success("Encuentro eliminado");
-    }
   };
 
   return (
@@ -260,7 +207,9 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSave}>{editingEncuentro ? "Guardar Cambios" : "Guardar Encuentro"}</Button>
+                <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? "Guardando..." : (editingEncuentro ? "Guardar Cambios" : "Guardar Encuentro")}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -268,7 +217,11 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
       </div>
 
       <div className="grid gap-4">
-        {encuentros.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2].map(i => <div key={i} className="h-32 bg-muted rounded animate-pulse" />)}
+          </div>
+        ) : encuentros.length === 0 ? (
           <Card className="border-dashed border-2 bg-muted/5">
             <CardContent className="p-10 flex flex-col items-center justify-center text-center">
               <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
@@ -286,7 +239,7 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
               key={encuentro.id} 
               encuentro={encuentro} 
               onEdit={() => handleOpenEdit(encuentro)}
-              onDelete={() => handleDelete(encuentro.id)}
+              onDelete={() => { if (confirm("¿Eliminar encuentro?")) deleteMutation.mutate(encuentro.id); }}
             />
           ))
         )}

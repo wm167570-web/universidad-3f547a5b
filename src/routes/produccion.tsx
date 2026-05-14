@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, db } from "@/lib/firebase";
+import { collection, getDocs, doc, updateDoc, query, where, orderBy } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -67,20 +68,17 @@ function ProduccionPage() {
 
   const { data: trabajos } = useQuery({
     enabled: !!user,
-    queryKey: ["trabajos", user?.id],
+    queryKey: ["trabajos", user?.uid],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("trabajos").select("*, materias(nombre, color)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      const q = query(collection(db, "trabajos"), orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
   });
 
   const moveMutation = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: string }) => {
-      const { error } = await supabase.from("trabajos").update({ estado }).eq("id", id);
-      if (error) throw error;
+      await updateDoc(doc(db, "trabajos", id), { estado });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trabajos"] }),
     onError: (e: Error) => toast.error(e.message),

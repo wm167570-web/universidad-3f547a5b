@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, db, storage } from "@/lib/firebase";
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs, onSnapshot } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,13 +46,9 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
     enabled: !!materiaId,
     queryKey: ["materia-notas", materiaId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("trabajos")
-        .select("id, titulo, tipo, nota, peso, trayecto, tipo_actividad, documento_url")
-        .eq("materia_id", materiaId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as NotaRow[];
+      const q = query(collection(db, "trabajos"), where("materia_id", "==", materiaId), orderBy("created_at", "asc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as NotaRow[];
     },
     refetchOnMount: "always",
     staleTime: 0,
@@ -59,20 +57,11 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
   // Forzar refetch inmediato y suscripción realtime al cambiar de materia
   useEffect(() => {
     if (!materiaId) return;
-    qc.invalidateQueries({ queryKey: ["materia-notas", materiaId] });
-
-    const channel = supabase
-      .channel(`materia-notas-${materiaId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "trabajos", filter: `materia_id=eq.${materiaId}` },
-        () => qc.invalidateQueries({ queryKey: ["materia-notas", materiaId] })
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const q = query(collection(db, "trabajos"), where("materia_id", "==", materiaId));
+    const unsubscribe = onSnapshot(q, () => {
+      qc.invalidateQueries({ queryKey: ["materia-notas", materiaId] });
+    });
+    return () => unsubscribe();
   }, [materiaId, qc]);
 
   const save = useMutation({
@@ -84,16 +73,9 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         if (!user) throw new Error("No autenticado");
-        const filePath = `${user.id}/${materiaId}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('materia-archivos')
-          .upload(filePath, file);
-
-        if (uploadError) {
-          setIsUploading(false);
-          throw uploadError;
-        }
+        const filePath = `${user.uid}/${materiaId}/${fileName}`;
+        const storageRef = ref(storage, filePath);
+        await uploadBytes(storageRef, file);
         finalDocUrl = filePath;
       }
 
@@ -106,15 +88,17 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
         tipo_actividad: form.tipo_actividad,
         documento_url: finalDocUrl,
         materia_id: materiaId,
-        user_id: user?.id || "",
+        user_id: user?.uid || "",
+        updated_at: new Date().toISOString(),
       };
 
       if (editing) {
-        const { error } = await supabase.from("trabajos").update(payload).eq("id", editing.id);
-        if (error) throw error;
+        await updateDoc(doc(db, "trabajos", editing.id), payload);
       } else {
-        const { error } = await supabase.from("trabajos").insert(payload);
-        if (error) throw error;
+        await addDoc(collection(db, "trabajos"), {
+          ...payload,
+          created_at: new Date().toISOString(),
+        });
       }
       setIsUploading(false);
     },
@@ -135,8 +119,7 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("trabajos").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "trabajos", id));
     },
     onSuccess: () => {
       toast.success("Eliminado");

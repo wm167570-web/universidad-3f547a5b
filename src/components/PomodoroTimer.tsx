@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart2 } from "lucide-react";
@@ -32,14 +33,12 @@ export function PromedioChart() {
   // Consultar trabajos con nota y materia
   const { data: trabajos = [] } = useQuery({
     enabled: !!user,
-    queryKey: ["trabajos-promedio-chart", user?.id],
+    queryKey: ["trabajos-promedio-chart", user?.uid],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("trabajos")
-        .select("nota, peso, materia_id, materias(nombre), fecha_entrega")
-        .not("nota", "is", null)
-        .order("fecha_entrega", { ascending: true });
-      return data ?? [];
+      const snapshot = await getDocs(collection(db, "trabajos"));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Filtrar los que tienen nota
+      return data.filter((t: any) => t.nota != null);
     },
   });
 

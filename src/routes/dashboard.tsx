@@ -2,7 +2,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useNavigate } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, db } from "@/lib/firebase";
+import { collection, getDocs, getDoc, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,17 +44,18 @@ function DashboardPage() {
   const handleExport = async () => {
     try {
       toast.loading("Generando Excel...", { id: "export" });
-      const [matRes, trabRes] = await Promise.all([
-        supabase.from("materias").select("*"),
-        supabase.from("trabajos").select("*"),
+      const [matSnap, trabSnap] = await Promise.all([
+        getDocs(collection(db, "materias")),
+        getDocs(collection(db, "trabajos")),
       ]);
-      if (matRes.error) throw matRes.error;
-      if (trabRes.error) throw trabRes.error;
+      
+      const materiasData = matSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const trabajosData = trabSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const matMap = new Map((matRes.data ?? []).map((m: any) => [m.id, m.nombre]));
+      const matMap = new Map((materiasData as any[]).map((m: any) => [m.id, m.nombre]));
 
       const wsMaterias = XLSX.utils.json_to_sheet(
-        (matRes.data ?? []).map((m: any) => ({
+        (materiasData as any[]).map((m: any) => ({
           Código: m.codigo ?? "",
           Nombre: m.nombre,
           Docente: m.docente ?? "",
@@ -65,7 +67,7 @@ function DashboardPage() {
       );
 
       const wsNotas = XLSX.utils.json_to_sheet(
-        (trabRes.data ?? []).map((t: any) => ({
+        (trabajosData as any[]).map((t: any) => ({
           Materia: matMap.get(t.materia_id) ?? "Sin materia",
           Título: t.titulo,
           Tipo: t.tipo,
@@ -77,7 +79,7 @@ function DashboardPage() {
       );
 
       const wsProduccion = XLSX.utils.json_to_sheet(
-        (trabRes.data ?? []).map((t: any) => ({
+        (trabajosData as any[]).map((t: any) => ({
           Título: t.titulo,
           Materia: matMap.get(t.materia_id) ?? "Sin materia",
           Tipo: t.tipo,
@@ -112,47 +114,34 @@ function DashboardPage() {
 
   // Créditos IA del usuario (solo lectura) + realtime
   const { data: credits } = useQuery({
-    enabled: !!user?.id,
-    queryKey: ["my-credits", user?.id],
+    enabled: !!user?.uid,
+    queryKey: ["my-credits", user?.uid],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("creditos_disponibles")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      return data?.creditos_disponibles ?? 0;
+      const docRef = doc(db, "profiles", user!.uid);
+      const docSnap = await getDoc(docRef);
+      return docSnap.exists() ? docSnap.data().creditos_disponibles : 0;
     },
     staleTime: 0,
   });
   const isSuperAdmin = user?.email === "wmartinezm360@gmail.com";
 
   useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel(`profile-credits-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
-        (payload: any) => {
-          const v = payload.new?.creditos_disponibles;
-          if (typeof v === "number") {
-            queryClient.setQueryData(["my-credits", user.id], v);
-          }
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, queryClient]);
+    if (!user?.uid) return;
+    const unsubscribe = onSnapshot(doc(db, "profiles", user.uid), (doc) => {
+      if (doc.exists()) {
+        queryClient.setQueryData(["my-credits", user.uid], doc.data().creditos_disponibles);
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.uid, queryClient]);
 
   const { data: materias, isLoading: materiasLoading } = useQuery({
     enabled: !!user,
-    queryKey: ["materias", user?.id],
+    queryKey: ["materias", user?.uid],
     queryFn: async () => {
-      const { data, error } = await supabase.from("materias").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      const q = query(collection(db, "materias"), orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
     staleTime: 0,
     refetchOnWindowFocus: true
@@ -160,11 +149,10 @@ function DashboardPage() {
 
   const { data: trabajos, isLoading: trabajosLoading } = useQuery({
     enabled: !!user,
-    queryKey: ["trabajos-dashboard", user?.id],
+    queryKey: ["trabajos-dashboard", user?.uid],
     queryFn: async () => {
-      const { data, error } = await supabase.from("trabajos").select("id, titulo, estado, fecha_entrega, nota, peso, materia_id");
-      if (error) throw error;
-      return data ?? [];
+      const snapshot = await getDocs(collection(db, "trabajos"));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
   });
 
@@ -423,46 +411,36 @@ function KPI({
 }
 
 function DashboardEncuentros({ materias }: { materias: any[] }) {
-  const [encuentrosPorMateria, setEncuentrosPorMateria] = useState<Record<string, any[]>>({});
-
-  useEffect(() => {
-    const saved = localStorage.getItem("academia-flow-encuentros");
-    if (saved) {
-      try {
-        const all = JSON.parse(saved);
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-
-        // Filtrar solo los futuros
-        const proximos = all.filter((e: any) => {
-          if (!e.fecha) return false;
-          // Usar la fecha del encuentro
-          const fechaE = new Date(e.fecha + "T00:00:00");
-          return fechaE >= hoy;
-        });
-
-        // Agrupar por materia
-        const grouped: Record<string, any[]> = {};
-        proximos.forEach((e: any) => {
-          if (!grouped[e.materiaId]) grouped[e.materiaId] = [];
-          grouped[e.materiaId].push(e);
-        });
-
-        // Ordenar cada grupo cronológicamente (ascendente)
-        Object.keys(grouped).forEach(mId => {
-          grouped[mId].sort((a, b) => {
-            const dateA = new Date(a.fecha + "T" + (a.hora?.split("-")[0].trim() || "00:00")).getTime();
-            const dateB = new Date(b.fecha + "T" + (b.hora?.split("-")[0].trim() || "00:00")).getTime();
-            return dateA - dateB;
-          });
-        });
-
-        setEncuentrosPorMateria(grouped);
-      } catch (e) {
-        console.error("Error loading encounters in dashboard", e);
-      }
+  const { user } = useAuth();
+  
+  const { data: encuentros = [], isLoading } = useQuery({
+    enabled: !!user,
+    queryKey: ["all-encuentros"],
+    queryFn: async () => {
+      const q = query(collection(db, "materia_encuentros"), orderBy("fecha", "asc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
-  }, []);
+  });
+
+  const encuentrosPorMateria = useMemo(() => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const proximos = (encuentros as any[]).filter((e: any) => {
+      if (!e.fecha) return false;
+      const fechaE = new Date(e.fecha + "T00:00:00");
+      return fechaE >= hoy;
+    });
+
+    const grouped: Record<string, any[]> = {};
+    proximos.forEach((e: any) => {
+      if (!grouped[e.materiaId]) grouped[e.materiaId] = [];
+      grouped[e.materiaId].push(e);
+    });
+
+    return grouped;
+  }, [encuentros]);
 
   const getMateriaInfo = (id: string) => materias.find(m => m.id === id);
   const subjectIds = Object.keys(encuentrosPorMateria);
@@ -476,7 +454,11 @@ function DashboardEncuentros({ materias }: { materias: any[] }) {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {subjectIds.length === 0 ? (
+        {isLoading ? (
+          <div className="p-4 space-y-3">
+            {[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        ) : subjectIds.length === 0 ? (
           <div className="text-sm text-muted-foreground py-12 text-center">
             No hay encuentros programados.
           </div>

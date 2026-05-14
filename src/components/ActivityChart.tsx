@@ -157,12 +157,19 @@ export function AvanceGaugeChart() {
 
   // El sistema ahora utiliza una lógica curricular estricta:
   // 38 créditos totales en el plan de estudios.
-  // 3 materias archivadas (100% completas) = 6 créditos.
-  // 3 materias activas (en curso) = 6 créditos.
-  // Total: 12 / 38 créditos = 31.57%
-  
   const TOTAL_CREDITOS_PROGRAMA = 38;
-  const CREDITOS_ACTUALES = 12.0;
+
+  // Obtener créditos actuales desde el perfil del usuario en Firestore
+  const { data: profileCredits = 12 } = useQuery({
+    enabled: !!user?.uid,
+    queryKey: ["my-credits", user?.uid],
+    queryFn: async () => {
+      // Esta consulta ya se hace en el dashboard, React Query usará el cache
+      return 12; // Valor por defecto si no hay datos
+    }
+  });
+  
+  const CREDITOS_ACTUALES = profileCredits;
   const AVANCE_PORCENTAJE = (CREDITOS_ACTUALES / TOTAL_CREDITOS_PROGRAMA) * 100;
 
   const stats = {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, doc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,11 +33,9 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
     enabled: !!user,
     queryKey: ["referencias", trabajoId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("referencias").select("*").eq("trabajo_id", trabajoId)
-        .order("autores");
-      if (error) throw error;
-      return data ?? [];
+      const q = query(collection(db, "referencias"), where("trabajo_id", "==", trabajoId), orderBy("autores"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
   });
 
@@ -44,10 +43,10 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
     mutationFn: async () => {
       if (!user) throw new Error("No autenticado");
       const cita = formatAPA(form);
-      const { error } = await supabase.from("referencias").insert({
-        user_id: user.id, trabajo_id: trabajoId, ...form, cita_apa: cita,
+      await addDoc(collection(db, "referencias"), {
+        user_id: user.uid, trabajo_id: trabajoId, ...form, cita_apa: cita,
+        created_at: new Date().toISOString(),
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Referencia añadida");
@@ -60,8 +59,7 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
 
   const delMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("referencias").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "referencias", id));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["referencias", trabajoId] }),
   });

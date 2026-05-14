@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,13 +35,16 @@ function HitoDialog({ tesisId, userId, hito, open, onOpenChange }: {
         titulo: form.titulo,
         descripcion: form.descripcion || null,
         fecha_limite: form.fecha_limite,
+        updated_at: new Date().toISOString(),
       };
       if (isEdit) {
-        const { error } = await supabase.from("tesis_hitos").update(payload).eq("id", hito.id);
-        if (error) throw error;
+        await updateDoc(doc(db, "tesis_hitos", hito.id), payload);
       } else {
-        const { error } = await supabase.from("tesis_hitos").insert(payload);
-        if (error) throw error;
+        await addDoc(collection(db, "tesis_hitos"), {
+          ...payload,
+          completado: false,
+          created_at: new Date().toISOString(),
+        });
       }
     },
     onSuccess: () => {
@@ -91,21 +95,22 @@ export function HitosTimeline({ tesisId, userId }: { tesisId: string; userId: st
   const { data: hitos = [], isLoading } = useQuery({
     queryKey: ["tesis-hitos", tesisId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tesis_hitos").select("*")
-        .eq("tesis_id", tesisId).order("fecha_limite");
-      if (error) throw error;
-      return data as Hito[];
+      const q = query(
+        collection(db, "tesis_hitos"),
+        where("tesis_id", "==", tesisId),
+        orderBy("fecha_limite")
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Hito[];
     },
   });
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, completado }: { id: string; completado: boolean }) => {
-      const { error } = await supabase.from("tesis_hitos").update({
+      await updateDoc(doc(db, "tesis_hitos", id), {
         completado,
         fecha_completado: completado ? new Date().toISOString().split("T")[0] : null,
-      }).eq("id", id);
-      if (error) throw error;
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tesis-hitos"] }),
     onError: (e: Error) => toast.error(e.message),
@@ -113,8 +118,7 @@ export function HitosTimeline({ tesisId, userId }: { tesisId: string; userId: st
 
   const delMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("tesis_hitos").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "tesis_hitos", id));
     },
     onSuccess: () => {
       toast.success("Hito eliminado");

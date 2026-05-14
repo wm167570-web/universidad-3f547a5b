@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,17 +50,19 @@ function CapituloDialog({ tesisId, userId, capitulo, open, onOpenChange }: {
         titulo: form.titulo,
         descripcion: form.descripcion || null,
         estado: form.estado,
-        palabras_objetivo: form.palabras_objetivo,
-        palabras_actuales: form.palabras_actuales,
+        palabras_objetivo: Number(form.palabras_objetivo),
+        palabras_actuales: Number(form.palabras_actuales),
         fecha_limite: form.fecha_limite || null,
         notas: form.notas || null,
+        updated_at: new Date().toISOString(),
       };
       if (isEdit) {
-        const { error } = await supabase.from("tesis_capitulos").update(payload).eq("id", capitulo.id);
-        if (error) throw error;
+        await updateDoc(doc(db, "tesis_capitulos", capitulo.id), payload);
       } else {
-        const { error } = await supabase.from("tesis_capitulos").insert(payload);
-        if (error) throw error;
+        await addDoc(collection(db, "tesis_capitulos"), {
+          ...payload,
+          created_at: new Date().toISOString(),
+        });
       }
     },
     onSuccess: () => {
@@ -139,8 +142,7 @@ function CapituloCard({ cap, tesisId, userId, onMove }: {
 
   const del = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("tesis_capitulos").delete().eq("id", cap.id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "tesis_capitulos", cap.id));
     },
     onSuccess: () => {
       toast.success("Capítulo eliminado");
@@ -214,18 +216,20 @@ export function CapitulosKanban({ tesisId, userId }: { tesisId: string; userId: 
   const { data: capitulos = [], isLoading } = useQuery({
     queryKey: ["tesis-capitulos", tesisId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tesis_capitulos").select("*")
-        .eq("tesis_id", tesisId).order("orden").order("created_at");
-      if (error) throw error;
-      return data as Capitulo[];
+      const q = query(
+        collection(db, "tesis_capitulos"),
+        where("tesis_id", "==", tesisId),
+        orderBy("orden"),
+        orderBy("created_at")
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Capitulo[];
     },
   });
 
   const moveMutation = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: string }) => {
-      const { error } = await supabase.from("tesis_capitulos").update({ estado }).eq("id", id);
-      if (error) throw error;
+      await updateDoc(doc(db, "tesis_capitulos", id), { estado });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tesis-capitulos"] }),
     onError: (e: Error) => toast.error(e.message),

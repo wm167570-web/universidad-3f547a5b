@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, db } from "@/lib/firebase";
+import { collection, getDocs, query, where, doc } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,14 +41,12 @@ function TesisPage() {
 
   const { data: tesis, isLoading } = useQuery({
     enabled: !!user,
-    queryKey: ["tesis", user?.id],
+    queryKey: ["tesis", user?.uid],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tesis").select("*")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const q = query(collection(db, "tesis"), where("user_id", "==", user!.uid));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
     },
   });
 
@@ -73,7 +72,7 @@ function TesisPage() {
       ) : !tesis ? (
         <div className="rounded-xl min-h-[400px] flex items-center justify-center"
           style={{ background: "rgba(35,5,5,0.7)", border: "1px solid rgba(245,158,11,0.15)", backdropFilter: "blur(12px)" }}>
-          <CrearTesisCard userId={user.id} />
+          <CrearTesisCard userId={user.uid} />
         </div>
       ) : (
         <div className="space-y-6">
@@ -101,11 +100,11 @@ function TesisPage() {
                 </TabsList>
 
                 <TabsContent value="capitulos">
-                  <CapitulosKanban tesisId={tesis.id} userId={user.id} />
+                  <CapitulosKanban tesisId={tesis.id} userId={user.uid} />
                 </TabsContent>
 
                 <TabsContent value="cronograma">
-                  <HitosTimeline tesisId={tesis.id} userId={user.id} />
+                  <HitosTimeline tesisId={tesis.id} userId={user.uid} />
                 </TabsContent>
 
                 <TabsContent value="documentos">

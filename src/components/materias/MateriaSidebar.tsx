@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { doc, deleteDoc } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -25,8 +26,7 @@ export function MateriaSidebar({ materias, selectedId, onSelect, onCreate, onEdi
 
   const removeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("materias").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "materias", id));
     },
     onSuccess: () => {
       toast.success("Materia eliminada");

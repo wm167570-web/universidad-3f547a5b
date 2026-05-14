@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { Materia } from "@/types/materias";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,56 +9,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { BookOpen, User, Calendar, Info, Hash, GraduationCap, Target, Lightbulb, Trophy, Pencil, Trash2 } from "lucide-react";
+import { Info, Hash, User, GraduationCap, Trophy, Pencil, Trash2, Target, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
-
-
 
 export function InformacionTab({ materia }: { materia: Materia }) {
   const qc = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  
+  const outcomes = (materia as any).outcomes || [
+    "Diseño de negocios responsables con impacto positivo en el entorno.",
+    "Liderazgo ético orientado a la toma de decisiones sostenibles."
+  ];
+
   const [editForm, setEditForm] = useState({
     descripcion: materia.descripcion || "",
     outcomes: [] as string[]
   });
   const [newOutcome, setNewOutcome] = useState("");
 
-  const STORAGE_OUTCOMES_KEY = `academia-flow-outcomes-${materia.id}`;
-
   const { data: trabajos = [] } = useQuery({
     queryKey: ["materia-notas", materia.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("trabajos")
-        .select("nota, peso")
-        .eq("materia_id", materia.id);
-      if (error) throw error;
-      return data ?? [];
+      const q = query(collection(db, "trabajos"), where("materia_id", "==", materia.id));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data());
     },
   });
 
-  const [outcomes, setOutcomes] = useState<string[]>([]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_OUTCOMES_KEY);
-    if (saved) {
-      try {
-        setOutcomes(JSON.parse(saved));
-      } catch (e) {
-        setOutcomes(["Diseño de negocios responsables con impacto positivo en el entorno.", "Liderazgo ético orientado a la toma de decisiones sostenibles."]);
-      }
-    } else {
-      setOutcomes(["Diseño de negocios responsables con impacto positivo en el entorno.", "Liderazgo ético orientado a la toma de decisiones sostenibles."]);
-    }
-  }, [materia.id]);
-
   const statsGrades = useMemo(() => {
-    const conNota = trabajos.filter((t) => t.nota !== null);
-    const totalPeso = conNota.reduce((s, t) => s + (Number(t.peso) || 0), 0);
+    const conNota = trabajos.filter((t: any) => t.nota !== null);
+    const totalPeso = conNota.reduce((s, t: any) => s + (Number(t.peso) || 0), 0);
     const promedio = totalPeso > 0
-      ? conNota.reduce((s, t) => s + (Number(t.nota) || 0) * (Number(t.peso) || 0), 0) / totalPeso
+      ? conNota.reduce((s, t: any) => s + (Number(t.nota) || 0) * (Number(t.peso) || 0), 0) / totalPeso
       : conNota.length > 0
-        ? conNota.reduce((s, t) => s + (Number(t.nota) || 0), 0) / conNota.length
+        ? conNota.reduce((s, t: any) => s + (Number(t.nota) || 0), 0) / conNota.length
         : 0;
     return { promedio, count: conNota.length };
   }, [trabajos]);
@@ -72,17 +57,10 @@ export function InformacionTab({ materia }: { materia: Materia }) {
 
   const handleSave = async () => {
     try {
-      // 1. Guardar descripción en Supabase
-      const { error } = await supabase
-        .from("materias")
-        .update({ descripcion: editForm.descripcion })
-        .eq("id", materia.id);
-
-      if (error) throw error;
-
-      // 2. Guardar outcomes en localStorage
-      localStorage.setItem(STORAGE_OUTCOMES_KEY, JSON.stringify(editForm.outcomes));
-      setOutcomes(editForm.outcomes);
+      await updateDoc(doc(db, "materias", materia.id), {
+        descripcion: editForm.descripcion,
+        outcomes: editForm.outcomes
+      });
       
       setIsEditing(false);
       qc.invalidateQueries({ queryKey: ["materias"] });
@@ -170,7 +148,7 @@ export function InformacionTab({ materia }: { materia: Materia }) {
               <h3 className="font-serif text-lg font-medium">Resultados de Aprendizaje</h3>
             </div>
             <ul className="space-y-3">
-              {outcomes.length > 0 ? outcomes.map((text, i) => (
+              {outcomes.length > 0 ? outcomes.map((text: string, i: number) => (
                 <LearningOutcome key={i} text={text} />
               )) : (
                 <p className="text-xs text-muted-foreground italic">No se han definido resultados de aprendizaje.</p>
@@ -236,7 +214,6 @@ export function InformacionTab({ materia }: { materia: Materia }) {
   );
 }
 
-
 function InfoCard({ icon: Icon, label, value }: { icon: any, label: string, value: string }) {
   return (
     <Card className="border-primary/30 bg-card/50 backdrop-blur-sm group transition-all duration-300">
@@ -263,4 +240,3 @@ function LearningOutcome({ text }: { text: string }) {
     </li>
   );
 }
-

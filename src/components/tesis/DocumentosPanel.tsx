@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db, storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { collection, addDoc, doc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,11 +34,9 @@ export function DocumentosPanel({ tesisId }: { tesisId: string }) {
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ["tesis-docs", tesisId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tesis_documentos").select("*")
-        .eq("tesis_id", tesisId).order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as Documento[];
+      const q = query(collection(db, "tesis_documentos"), where("tesis_id", "==", tesisId), orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Documento[];
     },
   });
 
@@ -46,16 +46,16 @@ export function DocumentosPanel({ tesisId }: { tesisId: string }) {
     let ok = 0;
     for (const file of Array.from(files)) {
       try {
-        const path = `${user.id}/${tesisId}/${Date.now()}-${file.name}`;
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file);
-        if (upErr) throw upErr;
-        const { error } = await supabase.from("tesis_documentos").insert({
-          tesis_id: tesisId, user_id: user.id,
+        const path = `${user.uid}/${tesisId}/${Date.now()}-${file.name}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, file);
+        await addDoc(collection(db, "tesis_documentos"), {
+          tesis_id: tesisId, user_id: user.uid,
           nombre: file.name, storage_path: path,
           tipo: tipoSeleccionado, tamanio: file.size,
           version: version || null,
+          created_at: new Date().toISOString(),
         });
-        if (error) throw error;
         ok++;
       } catch (e: any) {
         toast.error(`Error subiendo ${file.name}: ${e.message}`);
@@ -69,10 +69,9 @@ export function DocumentosPanel({ tesisId }: { tesisId: string }) {
   };
 
   const delMutation = useMutation({
-    mutationFn: async (doc: Documento) => {
-      await supabase.storage.from(BUCKET).remove([doc.storage_path]);
-      const { error } = await supabase.from("tesis_documentos").delete().eq("id", doc.id);
-      if (error) throw error;
+    mutationFn: async (docObj: Documento) => {
+      await deleteObject(ref(storage, docObj.storage_path));
+      await deleteDoc(doc(db, "tesis_documentos", docObj.id));
     },
     onSuccess: () => {
       toast.success("Documento eliminado");
@@ -82,10 +81,16 @@ export function DocumentosPanel({ tesisId }: { tesisId: string }) {
   });
 
   const descargar = async (path: string, nombre: string) => {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60);
-    if (error || !data) { toast.error("No se pudo generar el enlace"); return; }
-    const a = document.createElement("a");
-    a.href = data.signedUrl; a.download = nombre; a.click();
+    try {
+      const url = await getDownloadURL(ref(storage, path));
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.download = nombre;
+      a.click();
+    } catch (e: any) {
+      toast.error("No se pudo generar el enlace: " + e.message);
+    }
   };
 
   const TIPO_COLORS: Record<string, string> = {

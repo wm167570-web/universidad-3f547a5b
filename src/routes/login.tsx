@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, type FormEvent } from "react";
 import { GraduationCap, Mail, Lock, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+import { auth, googleProvider } from "@/lib/firebase";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,41 +35,40 @@ function AuthPage() {
   const handleSignIn = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (error) {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      toast.success("¡Bienvenido!");
+    } catch (error: any) {
       toast.error(error.message);
-      return;
+    } finally {
+      setBusy(false);
     }
-    toast.success("¡Bienvenido!");
   };
 
   const handleSignUp = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-        data: { full_name: name },
-      },
-    });
-    setBusy(false);
-    if (error) {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      if (name) {
+        await updateProfile(userCredential.user, { displayName: name });
+      }
+      toast.success("Cuenta creada exitosamente.");
+    } catch (error: any) {
       toast.error(error.message);
-      return;
+    } finally {
+      setBusy(false);
     }
-    toast.success("Cuenta creada. Revisa tu correo si requiere confirmación.");
   };
 
   const handleGoogle = async () => {
     setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/dashboard`,
-    });
-    if (result.error) {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      toast.success("¡Bienvenido!");
+    } catch (error: any) {
       toast.error("Error al iniciar con Google");
+    } finally {
       setBusy(false);
     }
   };

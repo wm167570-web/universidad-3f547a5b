@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +56,7 @@ function TesisEditDialog({ tesis, open, onOpenChange }: {
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("tesis").update({
+      await updateDoc(doc(db, "tesis", tesis.id), {
         titulo: form.titulo,
         subtitulo: form.subtitulo || null,
         director: form.director || null,
@@ -65,13 +66,12 @@ function TesisEditDialog({ tesis, open, onOpenChange }: {
         estado: form.estado,
         fecha_inicio: form.fecha_inicio || null,
         fecha_defensa: form.fecha_defensa || null,
-        palabras_objetivo: form.palabras_objetivo,
-        palabras_actuales: form.palabras_actuales,
+        palabras_objetivo: Number(form.palabras_objetivo),
+        palabras_actuales: Number(form.palabras_actuales),
         resumen: form.resumen || null,
         palabras_clave: form.palabras_clave ? form.palabras_clave.split(",").map(s => s.trim()).filter(Boolean) : null,
         updated_at: new Date().toISOString(),
-      }).eq("id", tesis.id);
-      if (error) throw error;
+      });
     },
     onSuccess: () => {
       toast.success("Tesis actualizada");
@@ -279,14 +279,14 @@ export function CrearTesisCard({ userId }: { userId: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("tesis").insert({
+      await addDoc(collection(db, "tesis"), {
         user_id: userId,
         titulo: titulo || "Mi Tesis de Maestría",
         estado: "en_progreso",
         palabras_objetivo: 50000,
         palabras_actuales: 0,
+        created_at: new Date().toISOString(),
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Proyecto de tesis creado");

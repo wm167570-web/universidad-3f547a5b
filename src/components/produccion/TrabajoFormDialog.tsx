@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, doc, updateDoc, query, orderBy } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,10 +85,11 @@ export function TrabajoFormDialog({
 
   const { data: materias } = useQuery({
     enabled: !!user && open,
-    queryKey: ["materias-list", user?.id],
+    queryKey: ["materias-list", user?.uid],
     queryFn: async () => {
-      const { data } = await supabase.from("materias").select("id, nombre").order("nombre");
-      return data ?? [];
+      const q = query(collection(db, "materias"), orderBy("nombre"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
   });
 
@@ -97,7 +99,7 @@ export function TrabajoFormDialog({
       // Validaciones suaves: si el estado es "entrega" y no hay fecha real, usar hoy.
       const hoy = new Date().toISOString().slice(0, 10);
       const payload = {
-        user_id: user.id,
+        user_id: user.uid,
         titulo: v.titulo.trim(),
         tipo: v.tipo,
         estado: v.estado,
@@ -123,13 +125,15 @@ export function TrabajoFormDialog({
         // Calificación
         nota: v.nota ? Number(v.nota) : null,
         calificacion_fecha: v.calificacion_fecha || (v.nota ? hoy : null),
+        updated_at: new Date().toISOString(),
       };
       if (v.id) {
-        const { error } = await supabase.from("trabajos").update(payload).eq("id", v.id);
-        if (error) throw error;
+        await updateDoc(doc(db, "trabajos", v.id), payload);
       } else {
-        const { error } = await supabase.from("trabajos").insert(payload);
-        if (error) throw error;
+        await addDoc(collection(db, "trabajos"), {
+          ...payload,
+          created_at: new Date().toISOString(),
+        });
       }
     },
     onSuccess: () => {

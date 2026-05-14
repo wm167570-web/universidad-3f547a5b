@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -70,14 +71,16 @@ export function MateriaFormDialog({ open, onOpenChange, userId, materia }: Props
         color: form.color,
         descripcion: form.descripcion || null,
         estado: form.estado,
+        updated_at: new Date().toISOString(),
       };
 
       if (isEditing) {
-        const { error } = await supabase.from("materias").update(payload).eq("id", materia!.id);
-        if (error) throw error;
+        await updateDoc(doc(db, "materias", materia!.id), payload);
       } else {
-        const { error } = await supabase.from("materias").insert(payload);
-        if (error) throw error;
+        await addDoc(collection(db, "materias"), {
+          ...payload,
+          created_at: new Date().toISOString(),
+        });
       }
     },
     onSuccess: () => {
@@ -87,14 +90,7 @@ export function MateriaFormDialog({ open, onOpenChange, userId, materia }: Props
     },
     onError: (e: any) => {
       console.error("Error al guardar materia:", e);
-      // El formulario NO se cierra porque onOpenChange(false) no se llama aquí
-      if (e.message?.includes("materias_estado_check")) {
-        toast.error(`Estado no permitido: El sistema solo acepta 'activo', 'inactivo' o 'archivado'. (Error: ${e.message})`);
-      } else if (e.code === "23514") {
-        toast.error(`Error de validación (Check constraint): ${e.message}`);
-      } else {
-        toast.error(`Error al guardar: ${e.message || "Inténtalo de nuevo."}`);
-      }
+      toast.error(`Error al guardar: ${e.message || "Inténtalo de nuevo."}`);
     },
   });
 

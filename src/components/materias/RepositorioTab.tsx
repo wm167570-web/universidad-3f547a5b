@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db, storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { collection, addDoc, doc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,13 +33,9 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
     enabled: !!user,
     queryKey: ["materia-archivos", materiaId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("materia_archivos")
-        .select("*")
-        .eq("materia_id", materiaId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      const q = query(collection(db, "materia_archivos"), where("materia_id", "==", materiaId), orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
   });
 
@@ -54,21 +52,19 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
           .replace(/[\u0300-\u036f]/g, "")
           .replace(/[^\w.\-]+/g, "_")
           .replace(/_+/g, "_");
-        const path = `${user.id}/${materiaId}/${Date.now()}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
-          contentType: file.type || "application/octet-stream",
-          upsert: false,
-        });
-        if (upErr) throw upErr;
-        const { error } = await supabase.from("materia_archivos").insert({
-          user_id: user.id,
+        const path = `${user.uid}/${materiaId}/${Date.now()}-${safeName}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, file);
+
+        await addDoc(collection(db, "materia_archivos"), {
+          user_id: user.uid,
           materia_id: materiaId,
           nombre: file.name,
           storage_path: path,
           tipo: file.type || "application/octet-stream",
           tamanio: file.size,
+          created_at: new Date().toISOString(),
         });
-        if (error) throw error;
         ok++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -84,9 +80,8 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
 
   const remove = useMutation({
     mutationFn: async (a: { id: string; storage_path: string }) => {
-      await supabase.storage.from(BUCKET).remove([a.storage_path]);
-      const { error } = await supabase.from("materia_archivos").delete().eq("id", a.id);
-      if (error) throw error;
+      await deleteObject(ref(storage, a.storage_path));
+      await deleteDoc(doc(db, "materia_archivos", a.id));
     },
     onSuccess: () => {
       toast.success("Archivo eliminado");
@@ -96,12 +91,16 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
   });
 
   const descargar = async (path: string, nombre: string) => {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60);
-    if (error || !data) { toast.error("No se pudo generar el enlace"); return; }
-    const a = document.createElement("a");
-    a.href = data.signedUrl;
-    a.download = nombre;
-    a.click();
+    try {
+      const url = await getDownloadURL(ref(storage, path));
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.download = nombre;
+      a.click();
+    } catch (e: any) {
+      toast.error("No se pudo generar el enlace: " + e.message);
+    }
   };
 
   return (
