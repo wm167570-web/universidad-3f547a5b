@@ -158,6 +158,7 @@ function AdminPanel() {
                   <th className="px-6 py-4 font-medium">Programa/Semestre</th>
                   <th className="px-6 py-4 font-medium">Fecha Registro</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
+                  <th className="px-6 py-4 font-medium">Créditos IA</th>
                   <th className="px-6 py-4 font-medium text-right">Acciones</th>
                 </tr>
               </thead>
