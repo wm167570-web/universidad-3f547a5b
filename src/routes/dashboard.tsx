@@ -110,6 +110,42 @@ function DashboardPage() {
     }
   }, [user?.id, queryClient]);
 
+  // Créditos IA del usuario (solo lectura) + realtime
+  const { data: credits } = useQuery({
+    enabled: !!user?.id,
+    queryKey: ["my-credits", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("creditos_disponibles")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data?.creditos_disponibles ?? 0;
+    },
+    staleTime: 0,
+  });
+  const isSuperAdmin = user?.email === "wmartinezm360@gmail.com";
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`profile-credits-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
+        (payload: any) => {
+          const v = payload.new?.creditos_disponibles;
+          if (typeof v === "number") {
+            queryClient.setQueryData(["my-credits", user.id], v);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
   const { data: materias, isLoading: materiasLoading } = useQuery({
     enabled: !!user,
     queryKey: ["materias", user?.id],
