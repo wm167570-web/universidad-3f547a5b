@@ -1,14 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const GEMINI_MODEL = "gemini-3-flash-preview";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const SUPER_ADMIN_EMAIL = "wmartinezm360@gmail.com";
 
 async function callAI(messages: Array<{ role: string; content: string }>) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY no configurada");
 
-  // Convert OpenAI-style messages to Gemini format
   const systemParts = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
   const contents = messages
     .filter((m) => m.role !== "system")
@@ -35,6 +36,24 @@ async function callAI(messages: Array<{ role: string; content: string }>) {
   return text;
 }
 
+/**
+ * Consume 1 IA credit for the calling user.
+ * - Super admin (wmartinezm360@gmail.com): unlimited, no consumption.
+ * - Otros usuarios: descuenta 1 crédito (con recarga diaria automática).
+ * Lanza un error si los créditos están agotados.
+ */
+async function consumeCredit(userId: string, email: string | undefined) {
+  if (email === SUPER_ADMIN_EMAIL) return; // exento
+  const { error } = await supabaseAdmin.rpc("consume_ai_credit", {
+    _user_id: userId,
+    _user_email: email ?? "",
+  });
+  if (error) {
+    // Mensaje del RAISE EXCEPTION de la función SQL
+    throw new Error(error.message || "No se pudo validar tus créditos de IA");
+  }
+}
+
 type GenInput = {
   titulo: string;
   tipo: string;
@@ -48,7 +67,10 @@ type GenInput = {
 export const generarContenido = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: GenInput) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const email = (context.claims as { email?: string }).email;
+    await consumeCredit(context.userId, email);
+
     const palabras = (data.paginas ?? 5) * 300;
     const system = `Eres un experto académico de alto nivel. Redacta trabajos universitarios rigurosos, bien estructurados y profesionales.
 
@@ -88,8 +110,11 @@ Estructura el documento con una jerarquía clara. Asegúrate de incluir tablas p
 export const humanizarContenido = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { contenido: string }) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     if (!data.contenido?.trim()) throw new Error("Contenido vacío");
+
+    const email = (context.claims as { email?: string }).email;
+    await consumeCredit(context.userId, email);
 
     const system = `Eres un experto en reescritura académica. Tu tarea es humanizar el contenido manteniendo su esencia, calidad y estructura.
 
