@@ -70,6 +70,30 @@ function AdminPanel() {
     onError: (err: any) => toast.error("Error: " + err.message),
   });
 
+  const updateCreditsMutation = useMutation({
+    mutationFn: async ({ userId, value }: { userId: string; value: number }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ creditos_disponibles: value })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onMutate: async ({ userId, value }) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+      const prev = queryClient.getQueryData<any[]>(["admin-users"]);
+      queryClient.setQueryData<any[]>(["admin-users"], (old) =>
+        (old || []).map((u) => (u.user_id === userId ? { ...u, creditos_disponibles: value } : u))
+      );
+      return { prev };
+    },
+    onError: (err: any, _v, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["admin-users"], ctx.prev);
+      toast.error("Error: " + err.message);
+    },
+    onSuccess: () => toast.success("Créditos actualizados"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
       const { error } = await supabase.from("profiles").delete().eq("user_id", userId);
@@ -201,9 +225,28 @@ function AdminPanel() {
                     <td className="px-6 py-4">
                       {u.is_approved ? (
                         <div className="flex flex-col gap-0.5 text-xs">
-                          <span className="font-mono text-emerald-400">
-                            {u.creditos_disponibles ?? 0} <span className="text-muted-foreground">disp.</span>
-                          </span>
+                          {isSuperAdmin ? (
+                            <input
+                              type="number"
+                              min={0}
+                              defaultValue={u.creditos_disponibles ?? 0}
+                              onBlur={(e) => {
+                                const v = Math.max(0, Number(e.target.value) || 0);
+                                if (v !== (u.creditos_disponibles ?? 0)) {
+                                  updateCreditsMutation.mutate({ userId: u.user_id, value: v });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              className="w-16 px-1.5 py-0.5 rounded bg-background/50 border border-emerald-500/30 text-emerald-400 font-mono text-xs focus:outline-none focus:border-emerald-400"
+                              title="Editar créditos disponibles"
+                            />
+                          ) : (
+                            <span className="font-mono text-emerald-400">
+                              {u.creditos_disponibles ?? 0} <span className="text-muted-foreground">disp.</span>
+                            </span>
+                          )}
                           <span className="font-mono text-muted-foreground">
                             {u.creditos_usados ?? 0} usados
                           </span>

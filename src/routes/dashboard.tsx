@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Trophy, Clock, AlertTriangle, CheckCircle, RefreshCw, Video, ExternalLink, FileSpreadsheet } from "lucide-react";
+import { BookOpen, Trophy, Clock, AlertTriangle, CheckCircle, RefreshCw, Video, ExternalLink, FileSpreadsheet, Sparkles } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -110,6 +110,42 @@ function DashboardPage() {
     }
   }, [user?.id, queryClient]);
 
+  // Créditos IA del usuario (solo lectura) + realtime
+  const { data: credits } = useQuery({
+    enabled: !!user?.id,
+    queryKey: ["my-credits", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("creditos_disponibles")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data?.creditos_disponibles ?? 0;
+    },
+    staleTime: 0,
+  });
+  const isSuperAdmin = user?.email === "wmartinezm360@gmail.com";
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`profile-credits-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
+        (payload: any) => {
+          const v = payload.new?.creditos_disponibles;
+          if (typeof v === "number") {
+            queryClient.setQueryData(["my-credits", user.id], v);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
   const { data: materias, isLoading: materiasLoading } = useQuery({
     enabled: !!user,
     queryKey: ["materias", user?.id],
@@ -189,6 +225,18 @@ function DashboardPage() {
           <h1 className="font-serif text-3xl md:text-4xl mt-1">Tu panel académico</h1>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {!isSuperAdmin && (
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary"
+              title="Créditos de IA disponibles"
+              style={{ fontFamily: "'Montserrat', 'Poppins', system-ui, sans-serif" }}
+            >
+              <Sparkles className="size-3.5" />
+              <span className="text-[11px] uppercase tracking-[0.14em] font-semibold">
+                Créditos IA: <span className="font-mono tabular-nums">{credits ?? 0}</span>
+              </span>
+            </div>
+          )}
           <div
             className="px-4 py-2 rounded-full border border-amber-400/30 bg-gradient-to-r from-amber-500/10 via-yellow-300/5 to-amber-500/10 shadow-[0_0_20px_-8px_rgba(251,191,36,0.5)]"
             style={{ fontFamily: "'Montserrat', 'Poppins', system-ui, sans-serif" }}
