@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Trophy, Clock, AlertTriangle, CheckCircle, RefreshCw, Video, ExternalLink, FileSpreadsheet } from "lucide-react";
+import { BookOpen, Trophy, Clock, AlertTriangle, CheckCircle, RefreshCw, Video, ExternalLink, FileSpreadsheet, Sparkles } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
