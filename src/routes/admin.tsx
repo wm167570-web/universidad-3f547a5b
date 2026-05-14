@@ -225,9 +225,28 @@ function AdminPanel() {
                     <td className="px-6 py-4">
                       {u.is_approved ? (
                         <div className="flex flex-col gap-0.5 text-xs">
-                          <span className="font-mono text-emerald-400">
-                            {u.creditos_disponibles ?? 0} <span className="text-muted-foreground">disp.</span>
-                          </span>
+                          {isSuperAdmin ? (
+                            <input
+                              type="number"
+                              min={0}
+                              defaultValue={u.creditos_disponibles ?? 0}
+                              onBlur={(e) => {
+                                const v = Math.max(0, Number(e.target.value) || 0);
+                                if (v !== (u.creditos_disponibles ?? 0)) {
+                                  updateCreditsMutation.mutate({ userId: u.user_id, value: v });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              className="w-16 px-1.5 py-0.5 rounded bg-background/50 border border-emerald-500/30 text-emerald-400 font-mono text-xs focus:outline-none focus:border-emerald-400"
+                              title="Editar créditos disponibles"
+                            />
+                          ) : (
+                            <span className="font-mono text-emerald-400">
+                              {u.creditos_disponibles ?? 0} <span className="text-muted-foreground">disp.</span>
+                            </span>
+                          )}
                           <span className="font-mono text-muted-foreground">
                             {u.creditos_usados ?? 0} usados
                           </span>
