@@ -225,6 +225,18 @@ function DashboardPage() {
           <h1 className="font-serif text-3xl md:text-4xl mt-1">Tu panel académico</h1>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {!isSuperAdmin && (
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary"
+              title="Créditos de IA disponibles"
+              style={{ fontFamily: "'Montserrat', 'Poppins', system-ui, sans-serif" }}
+            >
+              <Sparkles className="size-3.5" />
+              <span className="text-[11px] uppercase tracking-[0.14em] font-semibold">
+                Créditos IA: <span className="font-mono tabular-nums">{credits ?? 0}</span>
+              </span>
+            </div>
+          )}
           <div
             className="px-4 py-2 rounded-full border border-amber-400/30 bg-gradient-to-r from-amber-500/10 via-yellow-300/5 to-amber-500/10 shadow-[0_0_20px_-8px_rgba(251,191,36,0.5)]"
             style={{ fontFamily: "'Montserrat', 'Poppins', system-ui, sans-serif" }}
