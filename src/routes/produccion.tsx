@@ -18,6 +18,8 @@ import { TrabajoFormDialog, type TrabajoFormValues } from "@/components/producci
 import { TrabajoDetailSheet } from "@/components/produccion/TrabajoDetailSheet";
 import { KanbanBoard } from "@/components/produccion/KanbanBoard";
 import { toast } from "sonner";
+import { Trabajo } from "@/types";
+
 
 type ProduccionSearch = {
   tab?: string;
@@ -72,7 +74,7 @@ function ProduccionPage() {
     queryFn: async () => {
       const q = query(collection(db, "trabajos"), orderBy("created_at", "desc"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Trabajo[];
     },
   });
 

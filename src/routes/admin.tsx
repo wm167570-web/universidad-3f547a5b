@@ -16,6 +16,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { UserProfile } from "@/types";
+
 
 export const Route = createFileRoute("/admin")({
   component: AdminPanel,
@@ -33,7 +35,7 @@ function AdminPanel() {
     queryFn: async () => {
       const q = query(collection(db, "profiles"), orderBy("created_at", "desc"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserProfile[];
     },
     enabled: !!user && role === "admin",
   });

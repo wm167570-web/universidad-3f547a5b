@@ -3,16 +3,18 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
+import { UserProfile } from "@/types";
 
 const SUPER_ADMINS = ["wmartinezm360@gmail.com"];
 
 type AuthContextValue = {
   user: User | null;
-  profile: any | null;
+  profile: UserProfile | null;
   role: string | null;
   loading: boolean;
   signOut: () => Promise<void>;
 };
+
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -32,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const profileDoc = await getDoc(doc(db, "profiles", user.uid));
       const roleDoc = await getDoc(doc(db, "user_roles", user.uid));
 
-      const profileData: any = profileDoc.exists() ? profileDoc.data() : { user_id: user.uid, is_approved: false };
+      const profileData = (profileDoc.exists() ? profileDoc.data() : { user_id: user.uid, is_approved: false }) as UserProfile;
       
       if (isOwner) {
         profileData.is_approved = true;

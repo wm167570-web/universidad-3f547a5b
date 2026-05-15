@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { AvanceGaugeChart } from "@/components/ActivityChart";
 import { PromedioChart } from "@/components/PomodoroTimer";
+import { UserProfile, Materia, Trabajo } from "@/types";
+
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -119,7 +121,8 @@ function DashboardPage() {
     queryFn: async () => {
       const docRef = doc(db, "profiles", user!.uid);
       const docSnap = await getDoc(docRef);
-      return docSnap.exists() ? docSnap.data().creditos_disponibles : 0;
+      const data = docSnap.data() as UserProfile | undefined;
+      return data?.creditos_disponibles ?? 0;
     },
     staleTime: 0,
   });
@@ -129,7 +132,8 @@ function DashboardPage() {
     if (!user?.uid) return;
     const unsubscribe = onSnapshot(doc(db, "profiles", user.uid), (doc) => {
       if (doc.exists()) {
-        queryClient.setQueryData(["my-credits", user.uid], doc.data().creditos_disponibles);
+        const data = doc.data() as UserProfile;
+        queryClient.setQueryData(["my-credits", user.uid], data.creditos_disponibles);
       }
     });
     return () => unsubscribe();
@@ -141,7 +145,7 @@ function DashboardPage() {
     queryFn: async () => {
       const q = query(collection(db, "materias"), orderBy("created_at", "desc"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Materia[];
     },
     staleTime: 0,
     refetchOnWindowFocus: true
@@ -152,7 +156,7 @@ function DashboardPage() {
     queryKey: ["trabajos-dashboard", user?.uid],
     queryFn: async () => {
       const snapshot = await getDocs(collection(db, "trabajos"));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Trabajo[];
     },
   });
 

@@ -1,7 +1,22 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+// UI Components
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+// Icons
+import { Video, Plus, PlayCircle, Users, Calendar, Clock, ExternalLink, Trash2 } from "lucide-react";
+
 
 type Encuentro = {
   id: string;
