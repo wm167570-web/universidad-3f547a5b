@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Plus, User, BookOpen, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Materia } from "@/types/materias";
+import { Materia } from "@/types";
 
 
 

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { Materia, Trabajo } from "@/types";
 
 const TIPOS = ["ensayo", "informe", "proyecto", "monografía", "presentación", "tarea"];
 const ESTADOS = [
@@ -89,7 +90,7 @@ export function TrabajoFormDialog({
     queryFn: async () => {
       const q = query(collection(db, "materias"), orderBy("nombre"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Materia[];
     },
   });
 

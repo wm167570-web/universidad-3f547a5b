@@ -6,7 +6,7 @@ import { RepositorioTab } from "./RepositorioTab";
 import { TareasTab } from "./TareasTab";
 import { InformacionTab } from "./InformacionTab";
 import { EncuentrosTab } from "./EncuentrosTab";
-import { Materia } from "@/types/materias";
+import { Materia } from "@/types";
 
 function materiaEstadoLabel(estado: string) {
   switch (estado) {

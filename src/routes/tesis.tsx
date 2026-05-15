@@ -49,7 +49,7 @@ function TesisPage() {
       const snapshot = await getDocs(q);
       if (snapshot.empty) return null;
       const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() } as Tesis;
+      return { ...doc.data(), id: doc.id } as Tesis;
     },
   });
 

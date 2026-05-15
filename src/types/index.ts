@@ -12,20 +12,22 @@ export interface UserProfile {
   updated_at?: string;
 }
 
+export type MateriaEstado = "activo" | "inactivo" | "archivado";
+
 export interface Materia {
   id: string;
+  user_id: string;
   nombre: string;
-  estado: string;
-  codigo?: string;
-  docente?: string;
-  creditos?: number;
-  semestre?: string;
-  color?: string;
-  descripcion?: string;
+  estado: MateriaEstado | string;
+  codigo?: string | null;
+  docente?: string | null;
+  creditos?: number | null;
+  semestre?: string | null;
+  color?: string | null;
+  descripcion?: string | null;
   created_at?: string;
   updated_at?: string;
 }
-
 
 export interface Tarea {
   id: string;
@@ -40,7 +42,6 @@ export interface Tarea {
   trayecto?: number;
   tipo_actividad?: string;
 }
-
 
 export interface Trabajo extends Tarea {
   user_id: string;
@@ -62,11 +63,10 @@ export interface Trabajo extends Tarea {
   revision_fecha?: string;
   entrega_fecha_real?: string;
   entrega_medio?: string;
-  entrega_observaciones?: string;
+  entrega_observations?: string;
   calificacion_fecha?: string;
   contenido_humanizado?: string;
 }
-
 
 export interface Archivo {
   id: string;
@@ -91,6 +91,10 @@ export interface Tesis {
   metodologia?: string;
   avance?: number;
   notas?: string;
+  fecha_defensa?: any;
+  palabras_objetivo?: number;
+  palabras_actuales?: number;
+  resumen?: string;
+  palabras_clave?: string[];
   [key: string]: any;
 }
-

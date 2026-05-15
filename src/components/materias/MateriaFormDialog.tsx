@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { Materia, MateriaEstado } from "@/types/materias";
+import { Materia, MateriaEstado } from "@/types";
 
 const COLORS = ["#16a34a", "#0891b2", "#7c3aed", "#dc2626", "#d97706", "#0284c7", "#db2777", "#ea580c"];
 
