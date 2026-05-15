@@ -37,10 +37,11 @@ function DashboardPage() {
 
   const handleSync = async () => {
     setIsSyncing(true);
-    await queryClient.invalidateQueries({ queryKey: ["materias", user?.id] });
-    await queryClient.invalidateQueries({ queryKey: ["trabajos-dashboard", user?.id] });
+    await queryClient.invalidateQueries({ queryKey: ["materias", user?.uid] });
+    await queryClient.invalidateQueries({ queryKey: ["trabajos-dashboard", user?.uid] });
     setTimeout(() => setIsSyncing(false), 600); // Efecto visual
   };
+
 
 
   const handleExport = async () => {
@@ -108,11 +109,12 @@ function DashboardPage() {
 
   // Sincronización automática al montar el componente
   useEffect(() => {
-    if (user?.id) {
-      queryClient.invalidateQueries({ queryKey: ["materias", user.id] });
-      queryClient.invalidateQueries({ queryKey: ["trabajos-dashboard", user.id] });
+    if (user?.uid) {
+      queryClient.invalidateQueries({ queryKey: ["materias", user.uid] });
+      queryClient.invalidateQueries({ queryKey: ["trabajos-dashboard", user.uid] });
     }
-  }, [user?.id, queryClient]);
+  }, [user?.uid, queryClient]);
+
 
   // Créditos IA del usuario (solo lectura) + realtime
   const { data: credits } = useQuery({

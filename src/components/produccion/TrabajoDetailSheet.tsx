@@ -15,6 +15,8 @@ import { exportarTrabajoExcel } from "@/lib/excel-export";
 import { BibliografiaPanel } from "./BibliografiaPanel";
 import { ArchivosPanel } from "./ArchivosPanel";
 
+import { Trabajo, Materia } from "@/types";
+
 export function TrabajoDetailSheet({
   trabajoId, open, onOpenChange, onEdit,
 }: {
@@ -34,15 +36,16 @@ export function TrabajoDetailSheet({
     queryFn: async () => {
       const docSnap = await getDoc(doc(db, "trabajos", trabajoId!));
       if (!docSnap.exists()) return null;
-      const data = docSnap.data();
-      let materiaData = null;
+      const data = docSnap.data() as Trabajo;
+      let materiaData: Materia | null = null;
       if (data.materia_id) {
         const matSnap = await getDoc(doc(db, "materias", data.materia_id));
-        if (matSnap.exists()) materiaData = matSnap.data();
+        if (matSnap.exists()) materiaData = matSnap.data() as Materia;
       }
       return { id: docSnap.id, ...data, materias: materiaData };
     },
   });
+
 
   // ✅ Fix #2: Limpiar contenido al cambiar de trabajo (evita ver contenido del trabajo anterior)
   useEffect(() => {

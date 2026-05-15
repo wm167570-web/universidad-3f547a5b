@@ -32,6 +32,8 @@ export const Route = createFileRoute("/tesis")({
   component: TesisPage,
 });
 
+import { Tesis } from "@/types";
+
 function TesisPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -46,9 +48,10 @@ function TesisPage() {
       const q = query(collection(db, "tesis"), where("user_id", "==", user!.uid));
       const snapshot = await getDocs(q);
       if (snapshot.empty) return null;
-      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Tesis;
     },
   });
+
 
   if (loading || !user) return null;
 

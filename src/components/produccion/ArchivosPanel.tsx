@@ -40,6 +40,8 @@ const compressImage = async (file: File, maxWidth = 1920, quality = 0.8): Promis
   });
 };
 
+import { Archivo } from "@/types";
+
 export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -53,9 +55,10 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
     queryFn: async () => {
       const q = query(collection(db, "trabajo_archivos"), where("trabajo_id", "==", trabajoId), orderBy("created_at", "desc"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Archivo[];
     },
   });
+
 
   const handleUploadMultiple = async (files: FileList) => {
     if (!user || files.length === 0) return;

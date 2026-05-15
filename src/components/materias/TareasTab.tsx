@@ -4,15 +4,18 @@ import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
+import { Trabajo } from "@/types";
+
 export function TareasTab({ materiaId }: { materiaId: string }) {
   const { data: trabajos = [], isLoading } = useQuery({
     queryKey: ["materia-tareas", materiaId],
     queryFn: async () => {
       const q = query(collection(db, "trabajos"), where("materia_id", "==", materiaId), orderBy("fecha_entrega"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Trabajo[];
     },
   });
+
 
   if (isLoading) {
     return <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-14 bg-muted rounded animate-pulse" />)}</div>;

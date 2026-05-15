@@ -24,22 +24,27 @@ export interface Materia {
   descripcion?: string;
   created_at?: string;
   updated_at?: string;
+  trayecto?: string; // requested
+  tipo_actividad?: string; // requested
 }
 
-export interface Trabajo {
+export interface Tarea {
   id: string;
   titulo: string;
-  nombre?: string; // requested by user
   estado: string;
   tipo: string;
-  fecha_entrega: string;
-  peso?: number;
+  fecha_entrega: any;
+  peso: number;
+  materia_id?: string;
   nota?: number;
-  materia_id: string;
+  contenido?: string;
+}
+
+export interface Trabajo extends Tarea {
   user_id: string;
-  materias?: {
-    nombre: string;
-  };
+  nombre?: string;
+  materias?: Materia | null;
+
   descripcion?: string;
   instrucciones?: string;
   objetivos?: string;
@@ -57,4 +62,23 @@ export interface Trabajo {
   entrega_medio?: string;
   entrega_observaciones?: string;
   calificacion_fecha?: string;
+  contenido_humanizado?: string;
+}
+
+
+export interface Archivo {
+  id: string;
+  nombre: string;
+  tamanio: number;
+  storage_path: string;
+  created_at: any;
+}
+
+export interface Tesis {
+  id: string;
+  titulo: string;
+  subtitulo: string;
+  director: string;
+  co_director: string;
+  [key: string]: any;
 }

@@ -22,6 +22,8 @@ const BUCKET = "materia-archivos";
  *
  * Usa la tabla `materia_archivos` y el bucket `materia-archivos`.
  */
+import { Archivo } from "@/types";
+
 export function RepositorioTab({ materiaId }: { materiaId: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -35,9 +37,10 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
     queryFn: async () => {
       const q = query(collection(db, "materia_archivos"), where("materia_id", "==", materiaId), orderBy("created_at", "desc"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Archivo[];
     },
   });
+
 
   const handleUpload = async (files: FileList) => {
     if (!user || files.length === 0) return;
