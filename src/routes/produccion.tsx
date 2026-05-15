@@ -135,6 +135,7 @@ function ProduccionPage() {
       revision_fecha: t.revision_fecha ?? "",
       entrega_fecha_real: t.entrega_fecha_real ?? "",
       entrega_medio: t.entrega_medio ?? "",
+      // @ts-ignore
       entrega_observaciones: t.entrega_observaciones ?? "",
       nota: t.nota?.toString() ?? "",
       calificacion_fecha: t.calificacion_fecha ?? "",

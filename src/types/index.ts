@@ -63,7 +63,7 @@ export interface Trabajo extends Tarea {
   revision_fecha?: string;
   entrega_fecha_real?: string;
   entrega_medio?: string;
-  entrega_observations?: string;
+  entrega_observaciones?: string; // corrected from entrega_observations
   calificacion_fecha?: string;
   contenido_humanizado?: string;
 }
@@ -82,19 +82,19 @@ export interface Tesis {
   subtitulo: string;
   director: string;
   co_director: string;
-  institucion?: string;
-  programa?: string;
-  estado?: string;
+  institucion?: string | null;
+  programa?: string | null;
+  estado?: string | null;
   fecha_inicio?: any;
   fecha_fin?: any;
-  objetivos?: string;
-  metodologia?: string;
-  avance?: number;
-  notas?: string;
+  objetivos?: string | null;
+  metodologia?: string | null;
+  avance?: number | null;
+  notas?: string | null;
   fecha_defensa?: any;
-  palabras_objetivo?: number;
-  palabras_actuales?: number;
-  resumen?: string;
-  palabras_clave?: string[];
+  palabras_objetivo?: number | null;
+  palabras_actuales?: number | null;
+  resumen?: string | null;
+  palabras_clave?: string[] | null;
   [key: string]: any;
 }

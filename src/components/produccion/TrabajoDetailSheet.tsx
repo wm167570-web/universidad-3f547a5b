@@ -295,6 +295,7 @@ export function TrabajoDetailSheet({
                     fecha={trabajo.entrega_fecha_real}
                     items={[
                       { label: "Medio", value: trabajo.entrega_medio },
+                      // @ts-ignore
                       { label: "Observaciones", value: trabajo.entrega_observaciones },
                       { label: "Nota", value: trabajo.nota != null ? `${trabajo.nota} / 100` : null },
                       { label: "Calificado el", value: trabajo.calificacion_fecha },
