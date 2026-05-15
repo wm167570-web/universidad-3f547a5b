@@ -42,7 +42,7 @@ export function TrabajoDetailSheet({
         const matSnap = await getDoc(doc(db, "materias", data.materia_id));
         if (matSnap.exists()) materiaData = matSnap.data() as Materia;
       }
-      return { id: docSnap.id, ...data, materias: materiaData };
+      return { ...data, id: docSnap.id, materias: materiaData };
     },
   });
 
@@ -158,7 +158,7 @@ export function TrabajoDetailSheet({
         curso: trabajo.materias?.nombre ?? undefined,
         docente: trabajo.materias?.docente ?? undefined,
         contenido: texto,
-        referencias: refs?.map((r) => r.cita_apa ?? "").filter(Boolean) ?? [],
+        referencias: (refs as any)?.map((r: any) => r.cita_apa ?? "").filter(Boolean) ?? [],
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -191,7 +191,7 @@ export function TrabajoDetailSheet({
         curso: trabajo.materias?.nombre ?? undefined,
         docente: trabajo.materias?.docente ?? undefined,
         contenido: texto,
-        referencias: refs?.map((r) => r.cita_apa ?? "").filter(Boolean) ?? [],
+        referencias: (refs as any)?.map((r: any) => r.cita_apa ?? "").filter(Boolean) ?? [],
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

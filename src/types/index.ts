@@ -24,9 +24,8 @@ export interface Materia {
   descripcion?: string;
   created_at?: string;
   updated_at?: string;
-  trayecto?: string; // requested
-  tipo_actividad?: string; // requested
 }
+
 
 export interface Tarea {
   id: string;
@@ -38,7 +37,10 @@ export interface Tarea {
   materia_id?: string;
   nota?: number;
   contenido?: string;
+  trayecto?: number;
+  tipo_actividad?: string;
 }
+
 
 export interface Trabajo extends Tarea {
   user_id: string;
@@ -80,5 +82,15 @@ export interface Tesis {
   subtitulo: string;
   director: string;
   co_director: string;
+  institucion?: string;
+  programa?: string;
+  estado?: string;
+  fecha_inicio?: any;
+  fecha_fin?: any;
+  objetivos?: string;
+  metodologia?: string;
+  avance?: number;
+  notas?: string;
   [key: string]: any;
 }
+

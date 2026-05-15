@@ -71,7 +71,7 @@ function DashboardPage() {
 
       const wsNotas = XLSX.utils.json_to_sheet(
         (trabajosData as any[]).map((t: any) => ({
-          Materia: matMap.get(t.materia_id) ?? "Sin materia",
+          Materia: matMap.get(t.materia_id ?? null) ?? "Sin materia",
           Título: t.titulo,
           Tipo: t.tipo,
           Estado: t.estado,
@@ -81,10 +81,11 @@ function DashboardPage() {
         }))
       );
 
+
       const wsProduccion = XLSX.utils.json_to_sheet(
         (trabajosData as any[]).map((t: any) => ({
           Título: t.titulo,
-          Materia: matMap.get(t.materia_id) ?? "Sin materia",
+          Materia: matMap.get(t.materia_id ?? null) ?? "Sin materia",
           Tipo: t.tipo,
           "Tipo actividad": t.tipo_actividad ?? "",
           Trayecto: t.trayecto ?? "",
@@ -95,6 +96,7 @@ function DashboardPage() {
           Medio: t.entrega_medio ?? "",
         }))
       );
+
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, wsMaterias, "Gestión Académica");
@@ -340,7 +342,7 @@ function DashboardPage() {
                     <li key={t.id} className="py-3 flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <div className="font-medium truncate text-sm">{t.titulo}</div>
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-tight">{materiaName(t.materia_id)}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-tight">{materiaName(t.materia_id ?? null)}</div>
                       </div>
                       <div className={`text-xs font-mono shrink-0 ${urgente ? "text-destructive" : "text-muted-foreground"}`}>
                         {fecha.toLocaleDateString()} · {diff === 0 ? "hoy" : `${diff}d`}

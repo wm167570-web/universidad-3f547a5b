@@ -129,8 +129,8 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
         <ul className="space-y-2">
           {refs.map((r) => (
             <li key={r.id} className="text-sm p-3 rounded-md border bg-background flex items-start gap-2">
-              <span className="flex-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: (r.cita_apa ?? "").replace(/\*([^*]+)\*/g, "<em>$1</em>") }} />
-              <Button size="sm" variant="ghost" onClick={() => delMutation.mutate(r.id)}>
+              <span className="flex-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: ((r as any).cita_apa ?? "").replace(/\*([^*]+)\*/g, "<em>$1</em>") }} />
+              <Button size="sm" variant="ghost" onClick={() => delMutation.mutate((r as any).id)}>
                 <Trash2 className="size-3.5 text-destructive" />
               </Button>
             </li>

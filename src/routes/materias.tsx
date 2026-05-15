@@ -11,7 +11,7 @@ import { MateriaSidebar } from "@/components/materias/MateriaSidebar";
 import { MateriaDetailPanel } from "@/components/materias/MateriaDetailPanel";
 import { MateriaFormDialog } from "@/components/materias/MateriaFormDialog";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Materia } from "@/types/materias";
+import { Materia } from "@/types";
 
 type MateriasSearch = {
   selected?: string;
@@ -85,7 +85,7 @@ function MateriasPage() {
     queryFn: async () => {
       const q = query(collection(db, "trabajos"), where("user_id", "==", user?.uid || ""));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
     },
   });
 

@@ -48,7 +48,8 @@ function TesisPage() {
       const q = query(collection(db, "tesis"), where("user_id", "==", user!.uid));
       const snapshot = await getDocs(q);
       if (snapshot.empty) return null;
-      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Tesis;
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() } as Tesis;
     },
   });
 
