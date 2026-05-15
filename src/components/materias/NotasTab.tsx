@@ -29,6 +29,25 @@ type NotaRow = {
   documento_url: string | null;
 };
 
+function FileLink({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!path) return;
+    getDownloadURL(ref(storage, path))
+      .then(setUrl)
+      .catch(console.error);
+  }, [path]);
+
+  if (!url) return <span className="block text-[10px] text-muted-foreground mt-0.5">Cargando enlace...</span>;
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="block text-[10px] text-primary hover:underline mt-0.5">
+      Ver documento
+    </a>
+  );
+}
+
 export function NotasTab({ materiaId }: { materiaId: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -219,10 +238,7 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
                   <td className="px-4 py-3 font-medium">
                     {t.titulo}
                     {t.documento_url && (
-                      <a href={`${supabase.storage.from('materia-archivos').getPublicUrl(t.documento_url).data.publicUrl}`} 
-                         target="_blank" rel="noreferrer" className="block text-[10px] text-primary hover:underline mt-0.5">
-                        Ver documento
-                      </a>
+                      <FileLink path={t.documento_url} />
                     )}
                   </td>
                   <td className="px-3 py-3 text-center">

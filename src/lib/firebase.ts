@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCXv_pbxc2yXgr_voMzFL6el6ipvDxDseg",
-  authDomain: "academicopro-56462.firebaseapp.com",
-  projectId: "academicopro-56462",
-  storageBucket: "academicopro-56462.firebasestorage.app",
-  messagingSenderId: "900131451639",
-  appId: "1:900131451639:web:96461b5b5d3fb0ae5119f2"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCXv_pbxc2yXgr_voMzFL6el6ipvDxDseg",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "academicopro-56462.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "academicopro-56462",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "academicopro-56462.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "900131451639",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:900131451639:web:96461b5b5d3fb0ae5119f2"
 };
 
 // Initialize Firebase
