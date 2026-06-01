@@ -3,7 +3,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMemo } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Materia } from "@/types";
 
 function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
   const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
@@ -145,21 +144,19 @@ export function AvanceGaugeChart() {
       return snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      })) as Materia[];
+      })) as any[];
     },
   });
 
   const CREDITOS_ACTUALES = useMemo(() => {
     return materias
-      .filter((m) => m.estado === "activo" || m.estado === "archivado")
-      .reduce((sum, m) => sum + (m.creditos ?? 0), 0);
+      .filter((m: any) => m.estado === "activo" || m.estado === "archivado")
+      .reduce((sum: number, m: any) => sum + (m.creditos ?? 0), 0);
   }, [materias]);
-
-  const AVANCE_PORCENTAJE = (CREDITOS_ACTUALES / TOTAL_CREDITOS_PROGRAMA) * 100;
 
   const stats = {
     creditos: CREDITOS_ACTUALES,
-    porcentaje: AVANCE_PORCENTAJE,
+    porcentaje: (CREDITOS_ACTUALES / TOTAL_CREDITOS_PROGRAMA) * 100,
   };
 
   return (
