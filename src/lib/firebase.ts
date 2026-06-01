@@ -4,7 +4,7 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCXv_pbxc2yXgr_voMzFL6el6ipvDxDseg",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCXv_pbxc2yXgr_voMzfL6el6ipvDxDseg",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "academicopro-56462.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "academicopro-56462",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "academicopro-56462.firebasestorage.app",
