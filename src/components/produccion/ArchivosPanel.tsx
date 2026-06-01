@@ -81,7 +81,7 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
           .replace(/[^\w.\-]+/g, "_")
           .replace(/_+/g, "_");
         const path = `${user.uid}/${trabajoId}/${Date.now()}-${safeName}`;
-        const storageRef = ref(storage, path);
+        const storageRef = ref({ bucket: BUCKET }, path);
         await uploadBytes(storageRef, file);
         
         await addDoc(collection(db, "trabajo_archivos"), {
@@ -108,7 +108,7 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
 
   const removeMutation = useMutation({
     mutationFn: async (a: { id: string; storage_path: string }) => {
-      await deleteObject(ref(storage, a.storage_path));
+      await deleteObject(ref({ bucket: BUCKET }, a.storage_path));
       await deleteDoc(doc(db, "trabajo_archivos", a.id));
     },
     onSuccess: () => {
@@ -120,7 +120,7 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
 
   const descargar = async (path: string, nombre: string) => {
     try {
-      const url = await getDownloadURL(ref(storage, path));
+      const url = await getDownloadURL(ref({ bucket: BUCKET }, path));
       const a = document.createElement("a");
       a.href = url;
       a.target = "_blank";

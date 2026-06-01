@@ -21,7 +21,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "firebase/auth": ["./src/lib/supabase-auth-compat.ts"],
+      "firebase/firestore": ["./src/lib/supabase-firestore-compat.ts"],
+      "firebase/storage": ["./src/lib/supabase-storage-compat.ts"]
     }
   }
 }

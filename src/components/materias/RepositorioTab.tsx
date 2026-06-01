@@ -56,7 +56,7 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
           .replace(/[^\w.\-]+/g, "_")
           .replace(/_+/g, "_");
         const path = `${user.uid}/${materiaId}/${Date.now()}-${safeName}`;
-        const storageRef = ref(storage, path);
+        const storageRef = ref({ bucket: BUCKET }, path);
         await uploadBytes(storageRef, file);
 
         await addDoc(collection(db, "materia_archivos"), {
@@ -83,7 +83,7 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
 
   const remove = useMutation({
     mutationFn: async (a: { id: string; storage_path: string }) => {
-      await deleteObject(ref(storage, a.storage_path));
+      await deleteObject(ref({ bucket: BUCKET }, a.storage_path));
       await deleteDoc(doc(db, "materia_archivos", a.id));
     },
     onSuccess: () => {
@@ -95,7 +95,7 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
 
   const descargar = async (path: string, nombre: string) => {
     try {
-      const url = await getDownloadURL(ref(storage, path));
+      const url = await getDownloadURL(ref({ bucket: BUCKET }, path));
       const a = document.createElement("a");
       a.href = url;
       a.target = "_blank";

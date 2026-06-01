@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const GEMINI_MODEL = "gemini-3-flash-preview";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -41,25 +40,14 @@ async function callAI(messages: Array<{ role: string; content: string }>) {
  * - Super admin (wmartinezm360@gmail.com): unlimited, no consumption.
  * - Otros usuarios: descuenta 1 crédito.
  */
-async function consumeCredit(userId: string, email: string | undefined) {
+async function consumeCredit(supabase: any, userId: string, email: string | undefined) {
   if (email === SUPER_ADMIN_EMAIL) return; // exento
-  
-  const userRef = doc(db, "profiles", userId);
-  const userSnap = await getDoc(userRef);
-  
-  if (!userSnap.exists()) {
-    throw new Error("Perfil no encontrado para validar créditos");
-  }
 
-  const data = userSnap.data();
-  if ((data.creditos_disponibles || 0) <= 0) {
-    throw new Error("Has agotado tus créditos de IA disponibles");
-  }
-
-  await updateDoc(userRef, {
-    creditos_disponibles: increment(-1),
-    creditos_usados: increment(1)
+  const { error } = await supabase.rpc("consume_ai_credit", {
+    _user_id: userId,
+    _user_email: email ?? "",
   });
+  if (error) throw new Error(error.message);
 }
 
 type GenInput = {
@@ -73,12 +61,11 @@ type GenInput = {
 };
 
 export const generarContenido = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: GenInput) => input)
-  .handler(async ({ data }) => {
-    // Note: Temporary removal of server-side auth middleware during migration.
-    // Use data for auth info or implement requireFirebaseAuth.
-    const email = SUPER_ADMIN_EMAIL; // Fallback for credit logic
-    const userId = "temp_user_id"; // Needs real ID
+  .handler(async ({ data, context }) => {
+    const email = context.claims.email as string | undefined;
+    await consumeCredit(context.supabase, context.userId, email);
 
     const palabras = (data.paginas ?? 5) * 300;
     const system = `Eres un experto académico de alto nivel. Redacta trabajos universitarios rigurosos, bien estructurados y profesionales.
@@ -117,12 +104,13 @@ Estructura el documento con una jerarquía clara. Asegúrate de incluir tablas p
   });
 
 export const humanizarContenido = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: { contenido: string }) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     if (!data.contenido?.trim()) throw new Error("Contenido vacío");
 
-    const email = SUPER_ADMIN_EMAIL; // Fallback
-    const userId = "temp_user_id"; // Needs real ID
+    const email = context.claims.email as string | undefined;
+    await consumeCredit(context.supabase, context.userId, email);
 
     const system = `Eres un experto en reescritura académica. Tu tarea es humanizar el contenido manteniendo su esencia, calidad y estructura.
 

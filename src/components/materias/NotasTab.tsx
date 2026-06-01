@@ -17,6 +17,7 @@ import { toast } from "sonner";
 const TIPOS = ["parcial", "quiz", "ensayo", "informe", "proyecto", "tarea", "examen final", "exposición"];
 const TRAYECTOS = [1, 2, 3];
 const ACTIVIDADES = ["Autogestionable", "Actividad Entregable", "Puntos Adicionales", "Autoevaluación"];
+const BUCKET = "trabajo-archivos";
 
 type NotaRow = {
   id: string;
@@ -34,7 +35,7 @@ function FileLink({ path }: { path: string }) {
 
   useEffect(() => {
     if (!path) return;
-    getDownloadURL(ref(storage, path))
+    getDownloadURL(ref({ bucket: BUCKET }, path))
       .then(setUrl)
       .catch(console.error);
   }, [path]);
@@ -93,7 +94,7 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
         const fileName = `${Math.random()}.${fileExt}`;
         if (!user) throw new Error("No autenticado");
         const filePath = `${user.uid}/${materiaId}/${fileName}`;
-        const storageRef = ref(storage, filePath);
+        const storageRef = ref({ bucket: BUCKET }, filePath);
         await uploadBytes(storageRef, file);
         finalDocUrl = filePath;
       }
