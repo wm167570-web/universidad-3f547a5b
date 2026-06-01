@@ -29,21 +29,19 @@ function HitoDialog({ tesisId, userId, hito, open, onOpenChange }: {
   const save = useMutation({
     mutationFn: async () => {
       if (!form.fecha_limite) throw new Error("La fecha límite es requerida");
-      const payload = {
+      const basePayload = {
         tesis_id: tesisId, user_id: userId,
         titulo: form.titulo,
         descripcion: form.descripcion || null,
         fecha_limite: form.fecha_limite,
-        updated_at: new Date().toISOString(),
       };
       if (isEdit) {
-        const { error } = await supabase.from("tesis_hitos").update(payload).eq("id", hito!.id);
+        const { error } = await supabase.from("tesis_hitos").update(basePayload).eq("id", hito!.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("tesis_hitos").insert([{
-          ...payload,
+          ...basePayload,
           completado: false,
-          created_at: new Date().toISOString(),
         }]);
         if (error) throw error;
       }

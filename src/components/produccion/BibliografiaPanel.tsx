@@ -64,6 +64,7 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
   });
 
   const delMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase.from("referencias").delete().eq("id", id);
       if (error) throw error;
     },

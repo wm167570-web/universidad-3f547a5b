@@ -58,8 +58,8 @@ export function InformacionTab({ materia }: { materia: Materia }) {
     try {
       const { error } = await supabase.from("materias").update({
         descripcion: editForm.descripcion,
-        outcomes: editForm.outcomes
-      }).eq("id", materia.id);
+        outcomes: editForm.outcomes as any
+      } as any).eq("id", materia.id);
       if (error) throw error;
       
       setIsEditing(false);

@@ -83,23 +83,22 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { enlace_sesion, enlace_grabacion, ...restData } = formData;
+      if (!user?.id && !user?.uid) throw new Error("No autenticado");
       const payload = {
-        ...restData,
-        link: enlace_sesion,
-        link_grabacion: enlace_grabacion,
+        enlace_sesion: formData.enlace_sesion || null,
+        enlace_grabacion: formData.enlace_grabacion || null,
+        fecha: formData.fecha,
+        hora: formData.hora,
+        tematica: formData.tematica,
+        plataforma: formData.plataforma,
         materia_id: materiaId,
-        user_id: user?.id || user?.uid,
-        updated_at: new Date().toISOString(),
+        user_id: (user?.id || user?.uid) as string,
       };
       if (editingEncuentro) {
         const { error } = await supabase.from("materia_encuentros").update(payload).eq("id", editingEncuentro.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("materia_encuentros").insert([{
-          ...payload,
-          created_at: new Date().toISOString(),
-        }]);
+        const { error } = await supabase.from("materia_encuentros").insert([payload]);
         if (error) throw error;
       }
     },
