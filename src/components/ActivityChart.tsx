@@ -3,6 +3,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMemo } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Materia } from "@/types";
+
+/**
+ * GaugeChart — Velocímetro SVG de "Avance General"
+ * Muestra el progreso ponderado de todos los trabajos del usuario (0–100%).
+ * - 0–40%   → zona roja (crítico)
+ * - 40–70%  → zona naranja (en progreso)
+ * - 70–100% → zona verde (excelente)
+ */
 
 function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
   const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
@@ -138,20 +147,20 @@ export function AvanceGaugeChart() {
     enabled: !!user?.uid,
     queryKey: ["materias", user?.uid],
     queryFn: async () => {
-      const materiasRef = collection(db, "users", user!.uid, "materias");
-      const q = query(materiasRef, orderBy("createdAt", "desc"));
+      const q = query(collection(db, "materias"), orderBy("created_at", "desc"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as any[];
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Materia[];
     },
+    staleTime: 0
   });
 
   const CREDITOS_ACTUALES = useMemo(() => {
-    return materias
-      .filter((m: any) => m.estado === "activo" || m.estado === "archivado")
-      .reduce((sum: number, m: any) => sum + (m.creditos ?? 0), 0);
+    return materias.reduce((acc, m) => {
+      if (m.estado === "activo" || m.estado === "archivado") {
+        return acc + (Number(m.creditos) || 0);
+      }
+      return acc;
+    }, 0);
   }, [materias]);
 
   const stats = {
