@@ -23,7 +23,7 @@ type Encuentro = {
   fecha: string;
   hora: string;
   tematica: string;
-  estado: "programado" | "grabado";
+  estado?: "programado" | "grabado";
   plataforma: string;
   link?: string;
   linkGrabacion?: string;
@@ -84,7 +84,6 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
         ...formData,
         materiaId,
         user_id: user?.uid,
-        estado: checkEsPasado(formData.fecha, formData.hora) ? "grabado" : "programado",
         updated_at: new Date().toISOString(),
       };
       if (editingEncuentro) {
