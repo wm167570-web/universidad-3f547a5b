@@ -100,6 +100,18 @@ export async function getDocs(ref: QueryLike): Promise<CompatQuerySnapshot> {
 }
 
 export async function getDoc(ref: DocRef): Promise<CompatDocSnapshot> {
+  if (ref.table === "user_roles") {
+    const { data, error } = await (supabase as any).from(ref.table).select("*").eq("user_id", ref.id);
+    if (error) throw error;
+    const selected = (data ?? []).find((row: Record<string, unknown>) => row.role === "admin") ?? data?.[0] ?? null;
+    const row = selected ? denormalizeData(ref.table, selected as Record<string, unknown>) : null;
+    return {
+      exists: () => !!row,
+      id: ref.id,
+      data: () => row,
+    };
+  }
+
   const { data, error } = await (supabase as any).from(ref.table).select("*").eq(keyColumnFor(ref.table), ref.id).maybeSingle();
   if (error) throw error;
   const row = data ? denormalizeData(ref.table, data as Record<string, unknown>) : null;
