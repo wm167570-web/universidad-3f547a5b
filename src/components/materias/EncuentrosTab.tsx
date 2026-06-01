@@ -74,6 +74,8 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
       
       return (data || []).map(item => ({
         ...item,
+        enlace_sesion: item.link || item.enlace_sesion,
+        enlace_grabacion: item.link_grabacion || item.enlace_grabacion,
         estado: item.estado || "programado"
       })) as Encuentro[];
     },
@@ -81,8 +83,11 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const { enlace_sesion, enlace_grabacion, ...restData } = formData;
       const payload = {
-        ...formData,
+        ...restData,
+        link: enlace_sesion,
+        link_grabacion: enlace_grabacion,
         materia_id: materiaId,
         user_id: user?.id || user?.uid,
         updated_at: new Date().toISOString(),
