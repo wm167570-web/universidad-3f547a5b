@@ -63,11 +63,17 @@ export type Database = {
           created_at: string
           enlace_grabacion: string | null
           enlace_sesion: string | null
+          estado: string | null
           fecha: string
           hora: string | null
           id: string
+          link: string | null
+          link_grabacion: string | null
+          linkGrabacion: string | null
+          materiaId: string | null
           materia_id: string
           notas: string | null
+          plataforma: string | null
           tematica: string
           updated_at: string
           user_id: string
@@ -76,11 +82,17 @@ export type Database = {
           created_at?: string
           enlace_grabacion?: string | null
           enlace_sesion?: string | null
+          estado?: string | null
           fecha: string
           hora?: string | null
           id?: string
+          link?: string | null
+          link_grabacion?: string | null
+          linkGrabacion?: string | null
+          materiaId?: string | null
           materia_id: string
           notas?: string | null
+          plataforma?: string | null
           tematica: string
           updated_at?: string
           user_id: string
@@ -89,11 +101,17 @@ export type Database = {
           created_at?: string
           enlace_grabacion?: string | null
           enlace_sesion?: string | null
+          estado?: string | null
           fecha?: string
           hora?: string | null
           id?: string
+          link?: string | null
+          link_grabacion?: string | null
+          linkGrabacion?: string | null
+          materiaId?: string | null
           materia_id?: string
           notas?: string | null
+          plataforma?: string | null
           tematica?: string
           updated_at?: string
           user_id?: string
