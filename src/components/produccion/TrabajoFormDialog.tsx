@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, doc, updateDoc, query, orderBy } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,9 +87,9 @@ export function TrabajoFormDialog({
     enabled: !!user && open,
     queryKey: ["materias-list", user?.uid],
     queryFn: async () => {
-      const q = query(collection(db, "materias"), orderBy("nombre"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Materia[];
+      const { data, error } = await supabase.from("materias").select("*").order("nombre");
+      if (error) throw error;
+      return data as Materia[];
     },
   });
 
@@ -100,7 +99,7 @@ export function TrabajoFormDialog({
       // Validaciones suaves: si el estado es "entrega" y no hay fecha real, usar hoy.
       const hoy = new Date().toISOString().slice(0, 10);
       const payload = {
-        user_id: user.uid,
+        user_id: (user as any).id || (user as any).uid,
         titulo: v.titulo.trim(),
         tipo: v.tipo,
         estado: v.estado,
@@ -129,12 +128,11 @@ export function TrabajoFormDialog({
         updated_at: new Date().toISOString(),
       };
       if (v.id) {
-        await updateDoc(doc(db, "trabajos", v.id), payload);
+        const { error } = await supabase.from("trabajos").update(payload).eq("id", v.id);
+        if (error) throw error;
       } else {
-        await addDoc(collection(db, "trabajos"), {
-          ...payload,
-          created_at: new Date().toISOString(),
-        });
+        const { error } = await supabase.from("trabajos").insert(payload);
+        if (error) throw error;
       }
     },
     onSuccess: () => {

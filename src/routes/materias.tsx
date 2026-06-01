@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { auth, db } from "@/lib/firebase";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { BookOpen } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -58,9 +57,9 @@ function MateriasPage() {
     enabled: !!user,
     queryKey: ["materias", user?.uid],
     queryFn: async () => {
-      const q = query(collection(db, "materias"), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Materia[];
+      const { data, error } = await supabase.from("materias").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Materia[];
     },
     // Seleccionar la primera materia automáticamente cuando cargue la lista
     select: (data) => {
@@ -83,9 +82,9 @@ function MateriasPage() {
     enabled: !!user && materias.length > 0,
     queryKey: ["trabajos-progreso-materias", user?.uid],
     queryFn: async () => {
-      const q = query(collection(db, "trabajos"), where("user_id", "==", user?.uid || ""));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      const { data, error } = await supabase.from("trabajos").select("*").eq("user_id", user?.uid || "");
+      if (error) throw error;
+      return data as any[];
     },
   });
 

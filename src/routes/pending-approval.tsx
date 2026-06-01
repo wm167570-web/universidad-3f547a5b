@@ -1,8 +1,7 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, Clock, LogOut, Send, ShieldX, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,13 +23,14 @@ function PendingApproval() {
   const handleRequest = async () => {
     setBusy(true);
     try {
-      const profileRef = doc(db, "profiles", user.uid);
-      await setDoc(profileRef, {
-        user_id: user.uid,
-        display_name: user.displayName || user.email?.split("@")[0],
+      const { error } = await supabase.from("profiles").upsert({
+        user_id: user.id,
+        display_name: user.user_metadata?.full_name || user.email?.split("@")[0],
         is_approved: false,
         updated_at: new Date().toISOString()
-      }, { merge: true });
+      }, { onConflict: "user_id" });
+
+      if (error) throw error;
 
       setRequested(true);
       toast.success("Solicitud enviada al administrador");

@@ -1,7 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
-import { auth, db } from "@/lib/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { 
@@ -33,16 +32,17 @@ function AdminPanel() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const q = query(collection(db, "profiles"), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserProfile[];
+      const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as UserProfile[];
     },
     enabled: !!user && role === "admin",
   });
 
   const approveMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await updateDoc(doc(db, "profiles", userId), { is_approved: true });
+      const { error } = await supabase.from("profiles").update({ is_approved: true }).eq("id", userId);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -53,7 +53,8 @@ function AdminPanel() {
 
   const rejectMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await updateDoc(doc(db, "profiles", userId), { is_approved: false });
+      const { error } = await supabase.from("profiles").update({ is_approved: false }).eq("id", userId);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -64,7 +65,8 @@ function AdminPanel() {
 
   const updateCreditsMutation = useMutation({
     mutationFn: async ({ userId, value }: { userId: string; value: number }) => {
-      await updateDoc(doc(db, "profiles", userId), { creditos_disponibles: value });
+      const { error } = await supabase.from("profiles").update({ creditos_disponibles: value }).eq("id", userId);
+      if (error) throw error;
     },
     onMutate: async ({ userId, value }) => {
       await queryClient.cancelQueries({ queryKey: ["admin-users"] });
@@ -84,7 +86,8 @@ function AdminPanel() {
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await deleteDoc(doc(db, "profiles", userId));
+      const { error } = await supabase.from("profiles").delete().eq("id", userId);
+      if (error) throw error;
     },
     onMutate: async (userId: string) => {
       await queryClient.cancelQueries({ queryKey: ["admin-users"] });

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,12 +56,14 @@ function CapituloDialog({ tesisId, userId, capitulo, open, onOpenChange }: {
         updated_at: new Date().toISOString(),
       };
       if (isEdit) {
-        await updateDoc(doc(db, "tesis_capitulos", capitulo.id), payload);
+        const { error } = await supabase.from("tesis_capitulos").update(payload).eq("id", capitulo!.id);
+        if (error) throw error;
       } else {
-        await addDoc(collection(db, "tesis_capitulos"), {
+        const { error } = await supabase.from("tesis_capitulos").insert([{
           ...payload,
           created_at: new Date().toISOString(),
-        });
+        }]);
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -142,7 +143,8 @@ function CapituloCard({ cap, tesisId, userId, onMove }: {
 
   const del = useMutation({
     mutationFn: async () => {
-      await deleteDoc(doc(db, "tesis_capitulos", cap.id));
+      const { error } = await supabase.from("tesis_capitulos").delete().eq("id", cap.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Capítulo eliminado");
@@ -216,20 +218,20 @@ export function CapitulosKanban({ tesisId, userId }: { tesisId: string; userId: 
   const { data: capitulos = [], isLoading } = useQuery({
     queryKey: ["tesis-capitulos", tesisId],
     queryFn: async () => {
-      const q = query(
-        collection(db, "tesis_capitulos"),
-        where("tesis_id", "==", tesisId),
-        orderBy("orden"),
-        orderBy("created_at")
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Capitulo[];
+      const { data, error } = await supabase.from("tesis_capitulos")
+        .select("*")
+        .eq("tesis_id", tesisId)
+        .order("orden", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as Capitulo[];
     },
   });
 
   const moveMutation = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: string }) => {
-      await updateDoc(doc(db, "tesis_capitulos", id), { estado });
+      const { error } = await supabase.from("tesis_capitulos").update({ estado }).eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tesis-capitulos"] }),
     onError: (e: Error) => toast.error(e.message),

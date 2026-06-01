@@ -1,40 +1,41 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { UserProfile } from "@/types";
+import { User } from "@supabase/supabase-js";
 
 const SUPER_ADMINS = ["wmartinezm360@gmail.com"];
 
+// Ampliamos el User de Supabase para mantener retrocompatibilidad temporal con el DAL (uid)
+export type AppUser = User & { uid: string };
+
 type AuthContextValue = {
-  user: User | null;
+  user: AppUser | null;
   profile: UserProfile | null;
   role: string | null;
   loading: boolean;
   signOut: () => Promise<void>;
 };
 
-
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   // Perfil con React Query para caching y velocidad
   const { data: profileData, isLoading: profileLoading } = useQuery({
-    queryKey: ["user-profile", user?.uid],
+    queryKey: ["user-profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
 
       const isOwner = SUPER_ADMINS.includes(user.email ?? "");
 
-      // Intentar obtener perfil de Firestore
-      const profileDoc = await getDoc(doc(db, "profiles", user.uid));
-      const roleDoc = await getDoc(doc(db, "user_roles", user.uid));
+      // Intentar obtener perfil de Supabase
+      const { data: profileDoc } = await supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+      const { data: roleDoc } = await supabase.from('user_roles').select('*').eq('user_id', user.id).maybeSingle();
 
-      const profileData = (profileDoc.exists() ? profileDoc.data() : { user_id: user.uid, is_approved: false }) as UserProfile;
+      const profileData = (profileDoc ? profileDoc : { user_id: user.id, is_approved: false }) as UserProfile;
       
       if (isOwner) {
         profileData.is_approved = true;
@@ -42,24 +43,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return {
         profile: profileData,
-        role: isOwner ? "admin" : (roleDoc.exists() ? roleDoc.data()?.role : "estudiante"),
+        role: isOwner ? "admin" : (roleDoc ? roleDoc.role : "estudiante"),
       };
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 5,
   });
 
+  const mapSupabaseUser = (u: User | null): AppUser | null => {
+    if (!u) return null;
+    return { ...u, uid: u.id } as AppUser; // Mapping uid to id for DAL compat
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(mapSupabaseUser(session?.user ?? null));
       setAuthLoading(false);
     });
 
-    return () => unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(mapSupabaseUser(session?.user ?? null));
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    await supabase.auth.signOut();
   };
 
   const loading = authLoading || (!!user && profileLoading);

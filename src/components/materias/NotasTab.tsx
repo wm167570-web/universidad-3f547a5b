@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { auth, db, storage } from "@/lib/firebase";
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs, onSnapshot } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,9 +33,8 @@ function FileLink({ path }: { path: string }) {
 
   useEffect(() => {
     if (!path) return;
-    getDownloadURL(ref({ bucket: BUCKET }, path))
-      .then(setUrl)
-      .catch(console.error);
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    setUrl(data.publicUrl);
   }, [path]);
 
   if (!url) return <span className="block text-[10px] text-muted-foreground mt-0.5">Cargando enlace...</span>;
@@ -66,22 +63,23 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
     enabled: !!materiaId,
     queryKey: ["materia-notas", materiaId],
     queryFn: async () => {
-      const q = query(collection(db, "trabajos"), where("materia_id", "==", materiaId), orderBy("created_at", "asc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as NotaRow[];
+      const { data, error } = await supabase.from("trabajos").select("*").eq("materia_id", materiaId).order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as NotaRow[];
     },
     refetchOnMount: "always",
     staleTime: 0,
   });
 
-  // Forzar refetch inmediato y suscripción realtime al cambiar de materia
+  // Forzar refetch cuando cambia la materia via realtime
   useEffect(() => {
     if (!materiaId) return;
-    const q = query(collection(db, "trabajos"), where("materia_id", "==", materiaId));
-    const unsubscribe = onSnapshot(q, () => {
-      qc.invalidateQueries({ queryKey: ["materia-notas", materiaId] });
-    });
-    return () => unsubscribe();
+    const channel = supabase.channel(`trabajos-${materiaId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trabajos', filter: `materia_id=eq.${materiaId}` }, () => {
+        qc.invalidateQueries({ queryKey: ["materia-notas", materiaId] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [materiaId, qc]);
 
   const save = useMutation({
@@ -94,8 +92,8 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
         const fileName = `${Math.random()}.${fileExt}`;
         if (!user) throw new Error("No autenticado");
         const filePath = `${user.uid}/${materiaId}/${fileName}`;
-        const storageRef = ref({ bucket: BUCKET }, filePath);
-        await uploadBytes(storageRef, file);
+        const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file);
+        if (uploadError) throw uploadError;
         finalDocUrl = filePath;
       }
 
@@ -113,12 +111,14 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
       };
 
       if (editing) {
-        await updateDoc(doc(db, "trabajos", editing.id), payload);
+        const { error } = await supabase.from("trabajos").update(payload).eq("id", editing.id);
+        if (error) throw error;
       } else {
-        await addDoc(collection(db, "trabajos"), {
+        const { error } = await supabase.from("trabajos").insert([{
           ...payload,
           created_at: new Date().toISOString(),
-        });
+        }]);
+        if (error) throw error;
       }
       setIsUploading(false);
     },
@@ -139,7 +139,8 @@ export function NotasTab({ materiaId }: { materiaId: string }) {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      await deleteDoc(doc(db, "trabajos", id));
+      const { error } = await supabase.from("trabajos").delete().eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Eliminado");

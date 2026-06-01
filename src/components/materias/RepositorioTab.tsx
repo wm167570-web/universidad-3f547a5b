@@ -1,8 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db, storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { collection, addDoc, doc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,9 +33,9 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
     enabled: !!user,
     queryKey: ["materia-archivos", materiaId],
     queryFn: async () => {
-      const q = query(collection(db, "materia_archivos"), where("materia_id", "==", materiaId), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Archivo[];
+      const { data, error } = await supabase.from("materia_archivos").select("*").eq("materia_id", materiaId).order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Archivo[];
     },
   });
 
@@ -56,10 +54,10 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
           .replace(/[^\w.\-]+/g, "_")
           .replace(/_+/g, "_");
         const path = `${user.uid}/${materiaId}/${Date.now()}-${safeName}`;
-        const storageRef = ref({ bucket: BUCKET }, path);
-        await uploadBytes(storageRef, file);
+        const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, file);
+        if (uploadError) throw uploadError;
 
-        await addDoc(collection(db, "materia_archivos"), {
+        const { error: dbError } = await supabase.from("materia_archivos").insert([{
           user_id: user.uid,
           materia_id: materiaId,
           nombre: file.name,
@@ -67,7 +65,8 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
           tipo: file.type || "application/octet-stream",
           tamanio: file.size,
           created_at: new Date().toISOString(),
-        });
+        }]);
+        if (dbError) throw dbError;
         ok++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -83,8 +82,11 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
 
   const remove = useMutation({
     mutationFn: async (a: { id: string; storage_path: string }) => {
-      await deleteObject(ref({ bucket: BUCKET }, a.storage_path));
-      await deleteDoc(doc(db, "materia_archivos", a.id));
+      const { error: storageError } = await supabase.storage.from(BUCKET).remove([a.storage_path]);
+      if (storageError) throw storageError;
+      
+      const { error: dbError } = await supabase.from("materia_archivos").delete().eq("id", a.id);
+      if (dbError) throw dbError;
     },
     onSuccess: () => {
       toast.success("Archivo eliminado");
@@ -95,7 +97,8 @@ export function RepositorioTab({ materiaId }: { materiaId: string }) {
 
   const descargar = async (path: string, nombre: string) => {
     try {
-      const url = await getDownloadURL(ref({ bucket: BUCKET }, path));
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const url = data.publicUrl;
       const a = document.createElement("a");
       a.href = url;
       a.target = "_blank";

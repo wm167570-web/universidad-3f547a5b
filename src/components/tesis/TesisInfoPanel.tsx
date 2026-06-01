@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +55,7 @@ function TesisEditDialog({ tesis, open, onOpenChange }: {
 
   const save = useMutation({
     mutationFn: async () => {
-      await updateDoc(doc(db, "tesis", tesis.id), {
+      const { error } = await supabase.from("tesis").update({
         titulo: form.titulo,
         subtitulo: form.subtitulo || null,
         director: form.director || null,
@@ -71,7 +70,8 @@ function TesisEditDialog({ tesis, open, onOpenChange }: {
         resumen: form.resumen || null,
         palabras_clave: form.palabras_clave ? form.palabras_clave.split(",").map(s => s.trim()).filter(Boolean) : null,
         updated_at: new Date().toISOString(),
-      });
+      }).eq("id", tesis.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Tesis actualizada");
@@ -279,14 +279,15 @@ export function CrearTesisCard({ userId }: { userId: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      await addDoc(collection(db, "tesis"), {
+      const { error } = await supabase.from("tesis").insert([{
         user_id: userId,
         titulo: titulo || "Mi Tesis de Maestría",
         estado: "en_progreso",
         palabras_objetivo: 50000,
         palabras_actuales: 0,
         created_at: new Date().toISOString(),
-      });
+      }]);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Proyecto de tesis creado");

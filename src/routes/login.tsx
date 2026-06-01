@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, type FormEvent } from "react";
 import { GraduationCap, Mail, Lock, Loader2 } from "lucide-react";
-import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from "firebase/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +35,8 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       toast.success("¡Bienvenido!");
     } catch (error: any) {
       toast.error(error.message);
@@ -49,10 +49,12 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      if (name) {
-        await updateProfile(userCredential.user, { displayName: name });
-      }
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: { data: { full_name: name } }
+      });
+      if (error) throw error;
       toast.success("Cuenta creada exitosamente.");
     } catch (error: any) {
       toast.error(error.message);
@@ -64,8 +66,8 @@ function AuthPage() {
   const handleGoogle = async () => {
     setBusy(true);
     try {
-      await signInWithPopup(auth, googleProvider);
-      toast.success("¡Bienvenido!");
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      if (error) throw error;
     } catch (error: any) {
       toast.error("Error al iniciar con Google");
     } finally {

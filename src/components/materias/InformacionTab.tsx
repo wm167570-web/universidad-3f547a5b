@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { Materia } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,9 +29,9 @@ export function InformacionTab({ materia }: { materia: Materia }) {
   const { data: trabajos = [] } = useQuery({
     queryKey: ["materia-notas", materia.id],
     queryFn: async () => {
-      const q = query(collection(db, "trabajos"), where("materia_id", "==", materia.id));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => doc.data());
+      const { data, error } = await supabase.from("trabajos").select("*").eq("materia_id", materia.id);
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -57,10 +56,11 @@ export function InformacionTab({ materia }: { materia: Materia }) {
 
   const handleSave = async () => {
     try {
-      await updateDoc(doc(db, "materias", materia.id), {
+      const { error } = await supabase.from("materias").update({
         descripcion: editForm.descripcion,
         outcomes: editForm.outcomes
-      });
+      }).eq("id", materia.id);
+      if (error) throw error;
       
       setIsEditing(false);
       qc.invalidateQueries({ queryKey: ["materias"] });

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -25,8 +24,8 @@ type Encuentro = {
   tematica: string;
   estado?: "programado" | "grabado";
   plataforma: string;
-  link?: string;
-  linkGrabacion?: string;
+  enlace_sesion?: string;
+  enlace_grabacion?: string;
 };
 
 const STORAGE_KEY = "academia-flow-encuentros";
@@ -58,23 +57,25 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
   const [editingEncuentro, setEditingEncuentro] = useState<Encuentro | null>(null);
   
   const [formData, setFormData] = useState({
-    fecha: "", hora: "", tematica: "", plataforma: "Teams", link: "", linkGrabacion: ""
+    fecha: "", hora: "", tematica: "", plataforma: "Teams", enlace_sesion: "", enlace_grabacion: ""
   });
 
   const { data: encuentros = [], isLoading } = useQuery({
     enabled: !!user && !!materiaId,
     queryKey: ["materia-encuentros", materiaId],
     queryFn: async () => {
-      const q = query(collection(db, "materia_encuentros"), where("materiaId", "==", materiaId), orderBy("fecha", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          estado: data.estado || "programado",
-          ...data
-        };
-      }) as Encuentro[];
+      const { data, error } = await supabase
+        .from("materia_encuentros")
+        .select("*")
+        .eq("materia_id", materiaId)
+        .order("fecha", { ascending: false });
+        
+      if (error) throw error;
+      
+      return (data || []).map(item => ({
+        ...item,
+        estado: item.estado || "programado"
+      })) as Encuentro[];
     },
   });
 
@@ -82,17 +83,19 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
     mutationFn: async () => {
       const payload = {
         ...formData,
-        materiaId,
-        user_id: user?.uid,
+        materia_id: materiaId,
+        user_id: user?.id || user?.uid,
         updated_at: new Date().toISOString(),
       };
       if (editingEncuentro) {
-        await updateDoc(doc(db, "materia_encuentros", editingEncuentro.id), payload);
+        const { error } = await supabase.from("materia_encuentros").update(payload).eq("id", editingEncuentro.id);
+        if (error) throw error;
       } else {
-        await addDoc(collection(db, "materia_encuentros"), {
+        const { error } = await supabase.from("materia_encuentros").insert([{
           ...payload,
           created_at: new Date().toISOString(),
-        });
+        }]);
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -105,7 +108,8 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await deleteDoc(doc(db, "materia_encuentros", id));
+      const { error } = await supabase.from("materia_encuentros").delete().eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Encuentro eliminado");
@@ -116,7 +120,7 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
 
   const handleOpenAdd = () => {
     setEditingEncuentro(null);
-    setFormData({ fecha: "", hora: "", tematica: "", plataforma: "Teams", link: "", linkGrabacion: "" });
+    setFormData({ fecha: "", hora: "", tematica: "", plataforma: "Teams", enlace_sesion: "", enlace_grabacion: "" });
     setIsDialogOpen(true);
   };
 
@@ -124,7 +128,7 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
     setEditingEncuentro(encuentro);
     setFormData({
       fecha: encuentro.fecha, hora: encuentro.hora, tematica: encuentro.tematica,
-      plataforma: encuentro.plataforma, link: encuentro.link || "", linkGrabacion: encuentro.linkGrabacion || ""
+      plataforma: encuentro.plataforma, enlace_sesion: encuentro.enlace_sesion || "", enlace_grabacion: encuentro.enlace_grabacion || ""
     });
     setIsDialogOpen(true);
   };
@@ -201,27 +205,27 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="link">Link de la sesión (Opcional)</Label>
+                  <Label htmlFor="enlace_sesion">Link de la sesión (Opcional)</Label>
                   <Input 
-                    id="link" 
+                    id="enlace_sesion" 
                     placeholder="https://..." 
-                    value={formData.link}
-                    onChange={e => setFormData({...formData, link: e.target.value})}
+                    value={formData.enlace_sesion}
+                    onChange={e => setFormData({...formData, enlace_sesion: e.target.value})}
                   />
                 </div>
                 
                 {/* Campo de grabación habilitado si la fecha es pasada */}
                 {checkEsPasado(formData.fecha, formData.hora) && (
                   <div className="grid gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20 animate-in fade-in duration-300">
-                    <Label htmlFor="linkGrabacion" className="text-primary flex items-center gap-2">
+                    <Label htmlFor="enlace_grabacion" className="text-primary flex items-center gap-2">
                       <PlayCircle className="size-3.5" /> Link de la Grabación
                     </Label>
                     <Input 
-                      id="linkGrabacion" 
+                      id="enlace_grabacion" 
                       placeholder="https://..." 
                       className="bg-background border-primary/30"
-                      value={formData.linkGrabacion}
-                      onChange={e => setFormData({...formData, linkGrabacion: e.target.value})}
+                      value={formData.enlace_grabacion}
+                      onChange={e => setFormData({...formData, enlace_grabacion: e.target.value})}
                     />
                   </div>
                 )}
@@ -309,8 +313,8 @@ function EncuentroItem({ encuentro, onEdit, onDelete }: { encuentro: Encuentro, 
                   {encuentro.plataforma}
                 </Badge>
                 {!isProgramado && (
-                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${encuentro.linkGrabacion ? 'text-orange-500 border-orange-500/30' : 'text-muted-foreground border-muted-foreground/30'}`}>
-                    {encuentro.linkGrabacion ? 'Grabación disponible' : 'Sesión finalizada'}
+                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${encuentro.enlace_grabacion ? 'text-orange-500 border-orange-500/30' : 'text-muted-foreground border-muted-foreground/30'}`}>
+                    {encuentro.enlace_grabacion ? 'Grabación disponible' : 'Sesión finalizada'}
                   </Badge>
                 )}
               </div>
@@ -319,11 +323,11 @@ function EncuentroItem({ encuentro, onEdit, onDelete }: { encuentro: Encuentro, 
 
             <div className="flex items-center gap-2 shrink-0">
               {isPastSession ? (
-                encuentro.linkGrabacion ? (
+                encuentro.enlace_grabacion ? (
                   <Button 
                     size="sm" 
                     className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-                    onClick={() => window.open(encuentro.linkGrabacion, '_blank')}
+                    onClick={() => window.open(encuentro.enlace_grabacion, '_blank')}
                   >
                     <PlayCircle className="size-3.5" /> VER GRABACIÓN
                   </Button>
@@ -333,11 +337,11 @@ function EncuentroItem({ encuentro, onEdit, onDelete }: { encuentro: Encuentro, 
                   </Button>
                 )
               ) : (
-                encuentro.link ? (
+                encuentro.enlace_sesion ? (
                   <Button 
                     size="sm" 
                     className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-                    onClick={() => window.open(encuentro.link, '_blank')}
+                    onClick={() => window.open(encuentro.enlace_sesion, '_blank')}
                   >
                     <ExternalLink className="size-3.5" /> UNIRSE A LA SESIÓN
                   </Button>

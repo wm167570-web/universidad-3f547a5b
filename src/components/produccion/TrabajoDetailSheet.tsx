@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,15 +33,14 @@ export function TrabajoDetailSheet({
     enabled: !!trabajoId,
     queryKey: ["trabajo", trabajoId],
     queryFn: async () => {
-      const docSnap = await getDoc(doc(db, "trabajos", trabajoId!));
-      if (!docSnap.exists()) return null;
-      const data = docSnap.data() as Trabajo;
+      const { data, error } = await supabase.from("trabajos").select("*").eq("id", trabajoId!).single();
+      if (error || !data) return null;
       let materiaData: Materia | null = null;
       if (data.materia_id) {
-        const matSnap = await getDoc(doc(db, "materias", data.materia_id));
-        if (matSnap.exists()) materiaData = matSnap.data() as Materia;
+        const { data: matData } = await supabase.from("materias").select("*").eq("id", data.materia_id).single();
+        if (matData) materiaData = matData as Materia;
       }
-      return { ...data, id: docSnap.id, materias: materiaData };
+      return { ...data, materias: materiaData } as Trabajo;
     },
   });
 
@@ -65,16 +63,17 @@ export function TrabajoDetailSheet({
     enabled: !!trabajoId,
     queryKey: ["referencias", trabajoId],
     queryFn: async () => {
-      const q = query(collection(db, "referencias"), where("trabajo_id", "==", trabajoId!), orderBy("autores"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const { data, error } = await supabase.from("referencias").select("*").eq("trabajo_id", trabajoId!).order("autores");
+      if (error) throw error;
+      return data;
     },
   });
 
   const saveContent = useMutation({
     mutationFn: async (patch: { contenido?: string; contenido_humanizado?: string }) => {
       if (!trabajoId) throw new Error("Sin trabajo seleccionado");
-      await updateDoc(doc(db, "trabajos", trabajoId), patch);
+      const { error } = await supabase.from("trabajos").update(patch).eq("id", trabajoId);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trabajo", trabajoId] }),
     onError: (e: Error) => toast.error(e.message),
@@ -83,7 +82,8 @@ export function TrabajoDetailSheet({
   const delMutation = useMutation({
     mutationFn: async () => {
       if (!trabajoId) throw new Error("Sin trabajo seleccionado");
-      await deleteDoc(doc(db, "trabajos", trabajoId));
+      const { error } = await supabase.from("trabajos").delete().eq("id", trabajoId);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Trabajo eliminado");
@@ -95,10 +95,9 @@ export function TrabajoDetailSheet({
 
   // Helper: obtiene el access token actual y lo envía al server fn como Bearer
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Debes iniciar sesión para usar la IA");
-    const token = await user.getIdToken();
-    return { Authorization: `Bearer ${token}` };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Debes iniciar sesión para usar la IA");
+    return { Authorization: `Bearer ${session.access_token}` };
   };
 
   const handleGenerar = async () => {
@@ -147,9 +146,12 @@ export function TrabajoDetailSheet({
       if (!texto) { toast.error("Sin contenido para exportar"); setBusy(null); return; }
 
       // Cargar perfil para enriquecer la portada APA con nombre/programa del autor
-      const user = auth.currentUser;
-      const profileSnap = user ? await getDoc(doc(db, "profiles", user.uid)) : null;
-      const profile = profileSnap?.exists() ? profileSnap.data() : null;
+      const { data: { user } } = await supabase.auth.getUser();
+      let profile = null;
+      if (user) {
+        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        profile = profileData;
+      }
 
       const blob = await exportarTrabajoWord({
         titulo: trabajo.titulo,
@@ -179,9 +181,12 @@ export function TrabajoDetailSheet({
       const texto = humanizado?.trim() || contenido?.trim();
       if (!texto) { toast.error("Sin contenido para exportar"); setBusy(null); return; }
 
-      const user = auth.currentUser;
-      const profileSnap = user ? await getDoc(doc(db, "profiles", user.uid)) : null;
-      const profile = profileSnap?.exists() ? profileSnap.data() : null;
+      const { data: { user } } = await supabase.auth.getUser();
+      let profile = null;
+      if (user) {
+        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        profile = profileData;
+      }
 
       const blob = await exportarTrabajoExcel({
         titulo: trabajo.titulo,

@@ -1,8 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db, storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { collection, addDoc, doc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -53,9 +51,13 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
     enabled: !!user,
     queryKey: ["archivos", trabajoId],
     queryFn: async () => {
-      const q = query(collection(db, "trabajo_archivos"), where("trabajo_id", "==", trabajoId), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Archivo[];
+      const { data, error } = await supabase
+        .from("trabajo_archivos")
+        .select("*")
+        .eq("trabajo_id", trabajoId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Archivo[];
     },
   });
 
@@ -80,19 +82,22 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
           .replace(/[\u0300-\u036f]/g, "")
           .replace(/[^\w.\-]+/g, "_")
           .replace(/_+/g, "_");
-        const path = `${user.uid}/${trabajoId}/${Date.now()}-${safeName}`;
-        const storageRef = ref({ bucket: BUCKET }, path);
-        await uploadBytes(storageRef, file);
+        const path = `${(user as any).id || (user as any).uid}/${trabajoId}/${Date.now()}-${safeName}`;
         
-        await addDoc(collection(db, "trabajo_archivos"), {
-          user_id: user.uid,
+        const { error: storageError } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, file);
+        if (storageError) throw storageError;
+        
+        const { error: dbError } = await supabase.from("trabajo_archivos").insert({
+          user_id: (user as any).id || (user as any).uid,
           trabajo_id: trabajoId,
           nombre: file.name,
           storage_path: path,
           tipo: file.type,
           tamanio: file.size,
-          created_at: new Date().toISOString(),
         });
+        if (dbError) throw dbError;
         successCount++;
       } catch (err: any) {
         toast.error(`Error subiendo ${file.name}: ${err.message}`);
@@ -108,8 +113,9 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
 
   const removeMutation = useMutation({
     mutationFn: async (a: { id: string; storage_path: string }) => {
-      await deleteObject(ref({ bucket: BUCKET }, a.storage_path));
-      await deleteDoc(doc(db, "trabajo_archivos", a.id));
+      await supabase.storage.from(BUCKET).remove([a.storage_path]);
+      const { error } = await supabase.from("trabajo_archivos").delete().eq("id", a.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Archivo eliminado");
@@ -120,7 +126,8 @@ export function ArchivosPanel({ trabajoId }: { trabajoId: string }) {
 
   const descargar = async (path: string, nombre: string) => {
     try {
-      const url = await getDownloadURL(ref({ bucket: BUCKET }, path));
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const url = data.publicUrl;
       const a = document.createElement("a");
       a.href = url;
       a.target = "_blank";

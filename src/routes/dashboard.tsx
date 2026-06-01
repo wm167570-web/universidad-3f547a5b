@@ -2,8 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useNavigate } from "@tanstack/react-router";
-import { auth, db } from "@/lib/firebase";
-import { collection, getDocs, getDoc, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,12 +47,15 @@ function DashboardPage() {
     try {
       toast.loading("Generando Excel...", { id: "export" });
       const [matSnap, trabSnap] = await Promise.all([
-        getDocs(collection(db, "materias")),
-        getDocs(collection(db, "trabajos")),
+        supabase.from("materias").select("*"),
+        supabase.from("trabajos").select("*"),
       ]);
       
-      const materiasData = matSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const trabajosData = trabSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (matSnap.error) throw matSnap.error;
+      if (trabSnap.error) throw trabSnap.error;
+
+      const materiasData = matSnap.data;
+      const trabajosData = trabSnap.data;
 
       const matMap = new Map((materiasData as any[]).map((m: any) => [m.id, m.nombre]));
 
@@ -123,10 +125,8 @@ function DashboardPage() {
     enabled: !!user?.uid,
     queryKey: ["my-credits", user?.uid],
     queryFn: async () => {
-      const docRef = doc(db, "profiles", user!.uid);
-      const docSnap = await getDoc(docRef);
-      const data = docSnap.data() as UserProfile | undefined;
-      return data?.creditos_disponibles ?? 0;
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", user!.uid).maybeSingle();
+      return (data as UserProfile | undefined)?.creditos_disponibles ?? 0;
     },
     staleTime: 0,
   });
@@ -134,22 +134,34 @@ function DashboardPage() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const unsubscribe = onSnapshot(doc(db, "profiles", user.uid), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data() as UserProfile;
-        queryClient.setQueryData(["my-credits", user.uid], data.creditos_disponibles);
-      }
-    });
-    return () => unsubscribe();
+    const channel = supabase.channel('profiles_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.uid}`
+        },
+        (payload) => {
+          const data = payload.new as UserProfile;
+          queryClient.setQueryData(["my-credits", user.uid], data.creditos_disponibles);
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.uid, queryClient]);
 
   const { data: materias, isLoading: materiasLoading } = useQuery({
     enabled: !!user,
     queryKey: ["materias", user?.uid],
     queryFn: async () => {
-      const q = query(collection(db, "materias"), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Materia[];
+      const { data, error } = await supabase.from("materias").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Materia[];
     },
     staleTime: 0,
     refetchOnWindowFocus: true
@@ -159,8 +171,9 @@ function DashboardPage() {
     enabled: !!user,
     queryKey: ["trabajos-dashboard", user?.uid],
     queryFn: async () => {
-      const snapshot = await getDocs(collection(db, "trabajos"));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Trabajo[];
+      const { data, error } = await supabase.from("trabajos").select("*");
+      if (error) throw error;
+      return data as Trabajo[];
     },
   });
 
@@ -425,9 +438,9 @@ function DashboardEncuentros({ materias }: { materias: any[] }) {
     enabled: !!user,
     queryKey: ["all-encuentros"],
     queryFn: async () => {
-      const q = query(collection(db, "materia_encuentros"), orderBy("fecha", "asc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const { data, error } = await supabase.from("materia_encuentros").select("*").order("fecha", { ascending: true });
+      if (error) throw error;
+      return data;
     }
   });
 
@@ -443,8 +456,8 @@ function DashboardEncuentros({ materias }: { materias: any[] }) {
 
     const grouped: Record<string, any[]> = {};
     proximos.forEach((e: any) => {
-      if (!grouped[e.materiaId]) grouped[e.materiaId] = [];
-      grouped[e.materiaId].push(e);
+      if (!grouped[e.materia_id]) grouped[e.materia_id] = [];
+      grouped[e.materia_id].push(e);
     });
 
     return grouped;

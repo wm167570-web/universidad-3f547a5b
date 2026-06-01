@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { auth, db } from "@/lib/firebase";
-import { collection, getDocs, query, where, doc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,11 +44,9 @@ function TesisPage() {
     enabled: !!user,
     queryKey: ["tesis", user?.uid],
     queryFn: async () => {
-      const q = query(collection(db, "tesis"), where("user_id", "==", user!.uid));
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return null;
-      const doc = snapshot.docs[0];
-      return { ...doc.data(), id: doc.id } as any;
+      const { data, error } = await supabase.from("tesis").select("*").eq("user_id", user!.uid).limit(1).maybeSingle();
+      if (error) throw error;
+      return data as Tesis | null;
     },
   });
 

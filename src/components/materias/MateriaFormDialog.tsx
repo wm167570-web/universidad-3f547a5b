@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -75,12 +74,14 @@ export function MateriaFormDialog({ open, onOpenChange, userId, materia }: Props
       };
 
       if (isEditing) {
-        await updateDoc(doc(db, "materias", materia!.id), payload);
+        const { error } = await supabase.from("materias").update(payload).eq("id", materia!.id);
+        if (error) throw error;
       } else {
-        await addDoc(collection(db, "materias"), {
+        const { error } = await supabase.from("materias").insert([{
           ...payload,
           created_at: new Date().toISOString(),
-        });
+        }]);
+        if (error) throw error;
       }
     },
     onSuccess: () => {

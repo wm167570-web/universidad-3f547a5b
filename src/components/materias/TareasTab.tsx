@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
@@ -10,9 +9,9 @@ export function TareasTab({ materiaId }: { materiaId: string }) {
   const { data: trabajos = [], isLoading } = useQuery({
     queryKey: ["materia-tareas", materiaId],
     queryFn: async () => {
-      const q = query(collection(db, "trabajos"), where("materia_id", "==", materiaId), orderBy("fecha_entrega"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Trabajo[];
+      const { data, error } = await supabase.from("trabajos").select("*").eq("materia_id", materiaId).order("fecha_entrega", { ascending: true });
+      if (error) throw error;
+      return data as Trabajo[];
     },
   });
 

@@ -23,9 +23,6 @@ export default defineConfig({
   vite: {
     resolve: {
       alias: {
-        "firebase/auth": fileURLToPath(new URL("./src/lib/supabase-auth-compat.ts", import.meta.url)),
-        "firebase/firestore": fileURLToPath(new URL("./src/lib/supabase-firestore-compat.ts", import.meta.url)),
-        "firebase/storage": fileURLToPath(new URL("./src/lib/supabase-storage-compat.ts", import.meta.url)),
       },
     },
     server: {

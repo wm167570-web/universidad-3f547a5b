@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/integrations/supabase/client";
 import { Materia } from "@/types";
 
 /**
@@ -147,9 +146,9 @@ export function AvanceGaugeChart() {
     enabled: !!user?.uid,
     queryKey: ["materias", user?.uid],
     queryFn: async () => {
-      const q = query(collection(db, "materias"), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Materia[];
+      const { data, error } = await supabase.from("materias").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Materia[];
     },
     staleTime: 0
   });

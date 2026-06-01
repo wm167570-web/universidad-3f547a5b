@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, deleteDoc, query, where, orderBy, getDocs } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +32,13 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
     enabled: !!user,
     queryKey: ["referencias", trabajoId],
     queryFn: async () => {
-      const q = query(collection(db, "referencias"), where("trabajo_id", "==", trabajoId), orderBy("autores"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const { data, error } = await supabase
+        .from("referencias")
+        .select("*")
+        .eq("trabajo_id", trabajoId)
+        .order("autores");
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -43,10 +46,13 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
     mutationFn: async () => {
       if (!user) throw new Error("No autenticado");
       const cita = formatAPA(form);
-      await addDoc(collection(db, "referencias"), {
-        user_id: user.uid, trabajo_id: trabajoId, ...form, cita_apa: cita,
-        created_at: new Date().toISOString(),
+      const { error } = await supabase.from("referencias").insert({
+        user_id: (user as any).id || (user as any).uid,
+        trabajo_id: trabajoId,
+        ...form,
+        cita_apa: cita,
       });
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Referencia añadida");
@@ -58,8 +64,8 @@ export function BibliografiaPanel({ trabajoId }: { trabajoId: string }) {
   });
 
   const delMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await deleteDoc(doc(db, "referencias", id));
+      const { error } = await supabase.from("referencias").delete().eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["referencias", trabajoId] }),
   });
