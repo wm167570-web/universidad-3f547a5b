@@ -9,6 +9,7 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nitro } from "nitro/vite";
+import { fileURLToPath, URL } from "node:url";
 
 const deployVercel =
   process.env.VERCEL === "1" ||
@@ -20,6 +21,13 @@ export default defineConfig({
     ? { cloudflare: false as const, plugins: [nitro()] as const }
     : {}),
   vite: {
+    resolve: {
+      alias: {
+        "firebase/auth": fileURLToPath(new URL("./src/lib/supabase-auth-compat.ts", import.meta.url)),
+        "firebase/firestore": fileURLToPath(new URL("./src/lib/supabase-firestore-compat.ts", import.meta.url)),
+        "firebase/storage": fileURLToPath(new URL("./src/lib/supabase-storage-compat.ts", import.meta.url)),
+      },
+    },
     server: {
       hmr: {
         overlay: true,
