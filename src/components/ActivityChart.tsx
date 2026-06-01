@@ -1,14 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo } from "react";
-
-/**
- * GaugeChart — Velocímetro SVG de "Avance General"
- * Muestra el progreso ponderado de todos los trabajos del usuario (0–100%).
- * - 0–40%   → zona roja (crítico)
- * - 40–70%  → zona naranja (en progreso)
- * - 70–100% → zona verde (excelente)
- */
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Materia } from "@/types";
 
 function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
   const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
@@ -20,36 +15,30 @@ function describeArc(cx: number, cy: number, r: number, startAngle: number, endA
   return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
 }
 
-// El arco del velocímetro va de -150° a +150° (semicírculo extendido)
 const START_ANGLE = -150;
 const END_ANGLE = 150;
-const TOTAL_SWEEP = END_ANGLE - START_ANGLE; // 300°
+const TOTAL_SWEEP = END_ANGLE - START_ANGLE;
 
 function GaugeSVG({ value }: { value: number }) {
-  // value: 0–100
   const pct = Math.min(100, Math.max(0, value));
   const needle_angle = START_ANGLE + (pct / 100) * TOTAL_SWEEP;
-
   const cx = 120, cy = 120, rOuter = 90, rInner = 62;
 
-  // Zonas de color (en ángulos)
   const zones = [
-    { start: START_ANGLE, end: START_ANGLE + TOTAL_SWEEP * 0.4,  color: "#ef4444" }, // 0–40%
-    { start: START_ANGLE + TOTAL_SWEEP * 0.4, end: START_ANGLE + TOTAL_SWEEP * 0.7, color: "#f97316" }, // 40–70%
-    { start: START_ANGLE + TOTAL_SWEEP * 0.7, end: END_ANGLE,    color: "#22c55e" }, // 70–100%
+    { start: START_ANGLE, end: START_ANGLE + TOTAL_SWEEP * 0.4, color: "#ef4444" },
+    { start: START_ANGLE + TOTAL_SWEEP * 0.4, end: START_ANGLE + TOTAL_SWEEP * 0.7, color: "#f97316" },
+    { start: START_ANGLE + TOTAL_SWEEP * 0.7, end: END_ANGLE, color: "#22c55e" },
   ];
 
-  // Ángulo a coordenadas del puntero
   const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
   const nRad = toRad(needle_angle);
   const needleLen = 70;
   const nx = cx + needleLen * Math.cos(nRad);
   const ny = cy + needleLen * Math.sin(nRad);
 
-  // Color actual según valor
   const currentCredits = (pct * 38) / 100;
   const currentColor = pct < 40 ? "#ef4444" : pct < 70 ? "#f97316" : "#22c55e";
-  
+
   let label = "FUNDAMENTACIÓN";
   if (currentCredits >= 27) label = "TRASCENDENCIA";
   else if (currentCredits >= 13) label = "INTEGRACIÓN";
@@ -67,24 +56,20 @@ function GaugeSVG({ value }: { value: number }) {
         </filter>
       </defs>
 
-      {/* Fondo del arco (pista) */}
       <path d={describeArc(cx, cy, rOuter, START_ANGLE, END_ANGLE)}
         fill="none" stroke="rgba(74,4,4,0.5)" strokeWidth={28} strokeLinecap="round" />
 
-      {/* Zonas de color */}
       {zones.map((z, i) => (
         <path key={i} d={describeArc(cx, cy, rOuter, z.start, z.end)}
           fill="none" stroke={z.color} strokeWidth={28} strokeLinecap="butt" opacity={0.25} />
       ))}
 
-      {/* Arco de progreso activo */}
       {pct > 0 && (
         <path d={describeArc(cx, cy, rOuter, START_ANGLE, START_ANGLE + (pct / 100) * TOTAL_SWEEP)}
           fill="none" stroke={currentColor} strokeWidth={28} strokeLinecap="round"
           style={{ filter: `drop-shadow(0 0 6px ${currentColor}88)` }} />
       )}
 
-      {/* Marcas de ticks */}
       {[0, 25, 50, 75, 100].map((tick) => {
         const angle = START_ANGLE + (tick / 100) * TOTAL_SWEEP;
         const rad = toRad(angle);
@@ -106,31 +91,26 @@ function GaugeSVG({ value }: { value: number }) {
         );
       })}
 
-      {/* Puntero (aguja) */}
       <line x1={cx} y1={cy} x2={nx} y2={ny}
         stroke={currentColor} strokeWidth={3} strokeLinecap="round"
         filter="url(#glow-needle)" />
-      {/* Pivote central */}
       <circle cx={cx} cy={cy} r={8} fill="rgba(35,5,5,0.9)"
         stroke={currentColor} strokeWidth={2}
         style={{ filter: `drop-shadow(0 0 4px ${currentColor})` }} />
       <circle cx={cx} cy={cy} r={3} fill={currentColor} />
 
-      {/* Valor numérico central */}
       <text x={cx} y={cy + 32} textAnchor="middle"
         fontSize={22} fontWeight="bold" fill={currentColor}
         fontFamily="Rajdhani, Inter, sans-serif" filter="url(#glow-text)">
         {(Math.floor(pct * 10) / 10).toFixed(1)}%
       </text>
 
-      {/* Etiqueta de estado */}
       <text x={cx} y={cy + 50} textAnchor="middle"
         fontSize={8} fill="rgba(212,165,116,0.8)" letterSpacing={2}
         fontFamily="Inter, sans-serif">
         {label}
       </text>
 
-      {/* Etiquetas de zona (0, 40, 70, 100 en el arco) */}
       {[
         { v: 0, text: "0" }, { v: 40, text: "40" },
         { v: 70, text: "70" }, { v: 100, text: "100" },
@@ -153,43 +133,48 @@ function GaugeSVG({ value }: { value: number }) {
 
 export function AvanceGaugeChart() {
   const { user } = useAuth();
-
-  // El sistema ahora utiliza una lógica curricular estricta:
-  // 38 créditos totales en el plan de estudios.
   const TOTAL_CREDITOS_PROGRAMA = 38;
 
-  // Obtener créditos actuales desde el perfil del usuario en Firestore
-  const { data: profileCredits = 12 } = useQuery({
+  const { data: materias = [] } = useQuery({
     enabled: !!user?.uid,
-    queryKey: ["my-credits", user?.uid],
+    queryKey: ["materias", user?.uid],
     queryFn: async () => {
-      // Esta consulta ya se hace en el dashboard, React Query usará el cache
-      return 12; // Valor por defecto si no hay datos
-    }
+      const materiasRef = collection(db, "users", user!.uid, "materias");
+      const q = query(materiasRef, orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Materia[];
+    },
   });
-  
-  const CREDITOS_ACTUALES = profileCredits;
+
+  const CREDITOS_ACTUALES = useMemo(() => {
+    return materias
+      .filter((m) => m.estado === "activo" || m.estado === "archivado")
+      .reduce((sum, m) => sum + (m.creditos ?? 0), 0);
+  }, [materias]);
+
   const AVANCE_PORCENTAJE = (CREDITOS_ACTUALES / TOTAL_CREDITOS_PROGRAMA) * 100;
 
   const stats = {
     creditos: CREDITOS_ACTUALES,
-    porcentaje: AVANCE_PORCENTAJE
+    porcentaje: AVANCE_PORCENTAJE,
   };
 
   return (
     <div className="flex flex-col items-center h-full justify-center py-2">
       <GaugeSVG value={stats.porcentaje} />
-
-      {/* Leyenda inferior - Solo créditos curriculares */}
       <div className="flex items-center gap-4 mt-2">
         <div className="text-center">
           <div className="text-2xl font-bold font-serif text-[#d4a574]">
             {stats.creditos.toFixed(1)} / {TOTAL_CREDITOS_PROGRAMA}
           </div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">CRÉDITOS ACADÉMICOS</div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+            CRÉDITOS ACADÉMICOS
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
