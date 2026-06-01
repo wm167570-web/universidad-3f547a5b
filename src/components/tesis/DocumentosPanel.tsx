@@ -47,7 +47,7 @@ export function DocumentosPanel({ tesisId }: { tesisId: string }) {
     for (const file of Array.from(files)) {
       try {
         const path = `${user.uid}/${tesisId}/${Date.now()}-${file.name}`;
-        const storageRef = ref(storage, path);
+        const storageRef = ref({ bucket: BUCKET }, path);
         await uploadBytes(storageRef, file);
         await addDoc(collection(db, "tesis_documentos"), {
           tesis_id: tesisId, user_id: user.uid,
@@ -70,7 +70,7 @@ export function DocumentosPanel({ tesisId }: { tesisId: string }) {
 
   const delMutation = useMutation({
     mutationFn: async (docObj: Documento) => {
-      await deleteObject(ref(storage, docObj.storage_path));
+      await deleteObject(ref({ bucket: BUCKET }, docObj.storage_path));
       await deleteDoc(doc(db, "tesis_documentos", docObj.id));
     },
     onSuccess: () => {
@@ -82,7 +82,7 @@ export function DocumentosPanel({ tesisId }: { tesisId: string }) {
 
   const descargar = async (path: string, nombre: string) => {
     try {
-      const url = await getDownloadURL(ref(storage, path));
+      const url = await getDownloadURL(ref({ bucket: BUCKET }, path));
       const a = document.createElement("a");
       a.href = url;
       a.target = "_blank";
