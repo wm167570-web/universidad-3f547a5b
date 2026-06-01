@@ -67,7 +67,14 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
     queryFn: async () => {
       const q = query(collection(db, "materia_encuentros"), where("materiaId", "==", materiaId), orderBy("fecha", "desc"));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Encuentro[];
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          estado: data.estado || "programado",
+          ...data
+        };
+      }) as Encuentro[];
     },
   });
 
