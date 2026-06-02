@@ -41,7 +41,7 @@ function AdminPanel() {
 
   const approveMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase.from("profiles").update({ is_approved: true }).eq("id", userId);
+      const { error } = await supabase.from("profiles").update({ is_approved: true }).eq("user_id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -53,7 +53,7 @@ function AdminPanel() {
 
   const rejectMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase.from("profiles").update({ is_approved: false }).eq("id", userId);
+      const { error } = await supabase.from("profiles").update({ is_approved: false }).eq("user_id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -65,7 +65,7 @@ function AdminPanel() {
 
   const updateCreditsMutation = useMutation({
     mutationFn: async ({ userId, value }: { userId: string; value: number }) => {
-      const { error } = await supabase.from("profiles").update({ creditos_disponibles: value }).eq("id", userId);
+      const { error } = await supabase.from("profiles").update({ creditos_disponibles: value }).eq("user_id", userId);
       if (error) throw error;
     },
     onMutate: async ({ userId, value }) => {
@@ -86,7 +86,7 @@ function AdminPanel() {
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase.from("profiles").delete().eq("id", userId);
+      const { error } = await supabase.from("profiles").delete().eq("user_id", userId);
       if (error) throw error;
     },
     onMutate: async (userId: string) => {
