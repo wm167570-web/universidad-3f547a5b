@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Wand2, Download, Loader2, Pencil, Trash2, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import { generarContenido, humanizarContenido } from "@/server/ai-trabajos";
+import { generarContenido, humanizarContenido } from "@/lib/ai-trabajos";
 import { exportarTrabajoWord } from "@/lib/word-export";
 import { exportarTrabajoExcel } from "@/lib/excel-export";
 import { BibliografiaPanel } from "./BibliografiaPanel";
