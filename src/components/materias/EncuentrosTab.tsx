@@ -72,11 +72,12 @@ export function EncuentrosTab({ materiaId }: { materiaId: string }) {
         
       if (error) throw error;
       
-      return (data || []).map(item => ({
+      return (data || []).map((item: any) => ({
         ...item,
-        enlace_sesion: item.link || item.enlace_sesion,
-        enlace_grabacion: item.link_grabacion || item.enlace_grabacion,
-        estado: item.estado || "programado"
+        enlace_sesion: item.enlace_sesion ?? item.link ?? "",
+        enlace_grabacion: item.enlace_grabacion ?? item.link_grabacion ?? "",
+        plataforma: item.plataforma ?? "Teams",
+        estado: item.estado ?? "programado",
       })) as Encuentro[];
     },
   });
