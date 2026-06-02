@@ -16,7 +16,7 @@ import {
   generarConclusiones,
   humanizarTextoTesis,
   ensamblarTesisFinal
-} from "@/server/ai-tesis";
+} from "@/functions/ai-tesis";
 import { exportarTesisWord } from "@/lib/word-export-tesis";
 import { supabase } from "@/integrations/supabase/client";
 
