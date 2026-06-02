@@ -15,10 +15,19 @@ export function InformacionTab({ materia }: { materia: Materia }) {
   const qc = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   
-  const outcomes = (materia as any).outcomes || [
-    "Diseño de negocios responsables con impacto positivo en el entorno.",
-    "Liderazgo ético orientado a la toma de decisiones sostenibles."
-  ];
+  const parseOutcomes = (raw: any): string[] => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string" && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+      return raw.split("\n").map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+  const outcomes = parseOutcomes((materia as any).resultados_aprendizaje);
+
 
   const [editForm, setEditForm] = useState({
     descripcion: materia.descripcion || "",
@@ -58,9 +67,10 @@ export function InformacionTab({ materia }: { materia: Materia }) {
     try {
       const { error } = await supabase.from("materias").update({
         descripcion: editForm.descripcion,
-        outcomes: editForm.outcomes as any
+        resultados_aprendizaje: JSON.stringify(editForm.outcomes)
       } as any).eq("id", materia.id);
       if (error) throw error;
+
       
       setIsEditing(false);
       qc.invalidateQueries({ queryKey: ["materias"] });
