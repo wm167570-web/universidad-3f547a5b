@@ -2,19 +2,29 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-function purgeStaleSession() {
+/**
+ * Purge ONLY session tokens from OLD Supabase projects.
+ * Tokens from the CURRENT project are preserved so the user stays logged in.
+ * Supabase stores auth tokens under keys like: sb-{projectRef}-auth-token
+ */
+function purgeStaleSession(currentUrl: string) {
   if (typeof window === 'undefined') return;
   try {
-    // Remove any Supabase auth tokens from previous projects
+    // Extract project ref from URL, e.g. "wdseqguetcgibafibzax" from "https://wdseqguetcgibafibzax.supabase.co"
+    const match = currentUrl.match(/https:\/\/([^.]+)\.supabase\.co/);
+    const currentRef = match?.[1];
+    if (!currentRef) return;
+
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+      // Only remove sb-* keys that belong to a DIFFERENT project
+      if (key && key.startsWith('sb-') && !key.startsWith(`sb-${currentRef}-`)) {
         keysToRemove.push(key);
       }
     }
     if (keysToRemove.length > 0) {
-      console.info('[Supabase] Purging stale session keys:', keysToRemove);
+      console.info('[Supabase] Purging stale session keys from old projects:', keysToRemove);
       keysToRemove.forEach(k => localStorage.removeItem(k));
     }
   } catch (e) {
@@ -23,9 +33,6 @@ function purgeStaleSession() {
 }
 
 function createSupabaseClient() {
-  // Purge any stale sessions from a previous Supabase project on first load
-  purgeStaleSession();
-
   // Use import.meta.env for client-side (Vite build-time replacement)
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
   // Accept both ANON_KEY (standard) and PUBLISHABLE_KEY (legacy) for compatibility
@@ -43,6 +50,9 @@ function createSupabaseClient() {
     throw new Error(message);
   }
 
+  // Purge tokens from OLD projects only — preserve current project's session
+  purgeStaleSession(SUPABASE_URL);
+
   console.info(`[Supabase] Connecting to: ${SUPABASE_URL}`);
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -50,6 +60,7 @@ function createSupabaseClient() {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: true, // Handle OAuth callback tokens in URL
     }
   });
 }

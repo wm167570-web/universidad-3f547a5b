@@ -66,7 +66,12 @@ function AuthPage() {
   const handleGoogle = async () => {
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
       if (error) throw error;
     } catch (error: any) {
       toast.error("Error al iniciar con Google");
