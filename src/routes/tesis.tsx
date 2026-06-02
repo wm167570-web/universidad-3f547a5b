@@ -5,12 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/AppShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Microscope, LayoutGrid, Flag, FolderOpen } from "lucide-react";
+import { Loader2, Microscope, LayoutGrid, Flag, FolderOpen, Sparkles } from "lucide-react";
 
 import { TesisInfoPanel, CrearTesisCard } from "@/components/tesis/TesisInfoPanel";
 import { CapitulosKanban } from "@/components/tesis/CapitulosKanban";
 import { HitosTimeline } from "@/components/tesis/HitosTimeline";
 import { DocumentosPanel } from "@/components/tesis/DocumentosPanel";
+import { GeneradorIAPanel } from "@/components/tesis/GeneradorIAPanel";
 
 type TesisSearch = {
   tab?: string;
@@ -90,15 +91,18 @@ function TesisPage() {
             style={{ background: "rgba(35,5,5,0.72)", border: "1px solid rgba(245,158,11,0.15)", backdropFilter: "blur(12px)" }}>
             <div className="p-6">
               <Tabs value={tab} onValueChange={setTab}>
-                <TabsList className="w-full mb-6">
-                  <TabsTrigger value="capitulos" className="flex-1">
+                <TabsList className="w-full mb-6 flex flex-wrap h-auto">
+                  <TabsTrigger value="capitulos" className="flex-1 min-w-[120px]">
                     <LayoutGrid className="size-4 mr-2" />Capítulos
                   </TabsTrigger>
-                  <TabsTrigger value="cronograma" className="flex-1">
+                  <TabsTrigger value="cronograma" className="flex-1 min-w-[120px]">
                     <Flag className="size-4 mr-2" />Cronograma
                   </TabsTrigger>
-                  <TabsTrigger value="documentos" className="flex-1">
+                  <TabsTrigger value="documentos" className="flex-1 min-w-[120px]">
                     <FolderOpen className="size-4 mr-2" />Documentos
+                  </TabsTrigger>
+                  <TabsTrigger value="generador" className="flex-1 min-w-[120px] bg-primary/10 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Sparkles className="size-4 mr-2" />Generador IA
                   </TabsTrigger>
                 </TabsList>
 
@@ -112,6 +116,10 @@ function TesisPage() {
 
                 <TabsContent value="documentos">
                   <DocumentosPanel tesisId={tesis.id} />
+                </TabsContent>
+
+                <TabsContent value="generador">
+                  <GeneradorIAPanel tituloTesis={tesis.titulo} />
                 </TabsContent>
               </Tabs>
             </div>
