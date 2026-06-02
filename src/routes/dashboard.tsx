@@ -498,22 +498,38 @@ function DashboardEncuentros({ materias }: { materias: any[] }) {
                     </span>
                   </div>
                   <ul className="divide-y divide-border/30">
-                    {items.map((e) => (
-                      <li key={e.id} className="px-4 py-3 flex items-center justify-between gap-4 hover:bg-muted/10 transition-colors">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate text-sm uppercase tracking-tight text-foreground/90">{e.tematica}</div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-muted-foreground lowercase">{e.plataforma}</span>
+                    {items.map((e) => {
+                      const meetUrl = e.enlace_sesion || e.link || e.url || e.enlace_reunion || e.url_reunion;
+                      return (
+                        <li key={e.id} className="px-4 py-3 flex items-center justify-between gap-4 hover:bg-muted/10 transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium truncate text-sm uppercase tracking-tight text-foreground/90">{e.tematica}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-muted-foreground lowercase">{e.plataforma}</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xs font-mono font-semibold text-primary">
-                            {new Date(e.fecha + "T00:00:00").toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <div className="text-xs font-mono font-semibold text-primary">
+                                {new Date(e.fecha + "T00:00:00").toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">{e.hora}</div>
+                            </div>
+                            {meetUrl && (
+                              <a
+                                href={meetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 hover:border-primary/30 transition-all"
+                              >
+                                <Video className="size-3.5" />
+                                <span>Unirse</span>
+                              </a>
+                            )}
                           </div>
-                          <div className="text-[10px] text-muted-foreground">{e.hora}</div>
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               );
