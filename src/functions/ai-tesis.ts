@@ -1,8 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import * as mammoth from "mammoth";
-// @ts-ignore
-import pdfParse from "pdf-parse";
 
 const GEMINI_MODEL = "gemini-3-flash-preview";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -204,9 +201,12 @@ export const ensamblarTesisFinal = createServerFn({ method: "POST" })
       try {
         const buffer = Buffer.from(data.plantillaBase64, "base64");
         if (data.plantillaExt === "docx") {
+          const mammoth = await import("mammoth");
           const result = await mammoth.extractRawText({ buffer });
           plantillaTexto = result.value;
         } else if (data.plantillaExt === "pdf") {
+          const pdfParseModule = await import("pdf-parse");
+          const pdfParse = (pdfParseModule as any).default || pdfParseModule;
           const result = await pdfParse(buffer);
           plantillaTexto = result.text;
         }
