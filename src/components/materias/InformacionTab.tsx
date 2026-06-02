@@ -67,9 +67,10 @@ export function InformacionTab({ materia }: { materia: Materia }) {
     try {
       const { error } = await supabase.from("materias").update({
         descripcion: editForm.descripcion,
-        outcomes: editForm.outcomes as any
+        resultados_aprendizaje: JSON.stringify(editForm.outcomes)
       } as any).eq("id", materia.id);
       if (error) throw error;
+
       
       setIsEditing(false);
       qc.invalidateQueries({ queryKey: ["materias"] });
