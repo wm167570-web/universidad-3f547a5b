@@ -125,7 +125,7 @@ function DashboardPage() {
     enabled: !!user?.uid,
     queryKey: ["my-credits", user?.uid],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", user!.uid).maybeSingle();
+      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", user!.uid).maybeSingle();
       return (data as UserProfile | undefined)?.creditos_disponibles ?? 0;
     },
     staleTime: 0,
@@ -141,7 +141,7 @@ function DashboardPage() {
           event: 'UPDATE',
           schema: 'public',
           table: 'profiles',
-          filter: `id=eq.${user.uid}`
+          filter: `user_id=eq.${user.uid}`
         },
         (payload) => {
           const data = payload.new as UserProfile;
