@@ -20,6 +20,35 @@ import {
 import { exportarTesisWord } from "@/lib/word-export-tesis";
 import { supabase } from "@/integrations/supabase/client";
 
+interface TemaOption {
+  numero: number;
+  titulo: string;
+  variableIndependiente: string;
+  variableDependiente: string;
+  problema: string;
+  justificacion: string;
+  enfoqueMetodologico: string;
+}
+
+function extraerJSON(texto: string): TemaOption[] | null {
+  if (!texto) return null;
+  let t = texto.trim();
+  // strip code fences
+  t = t.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  // find first '[' to last ']'
+  const start = t.indexOf("[");
+  const end = t.lastIndexOf("]");
+  if (start === -1 || end === -1 || end <= start) return null;
+  const slice = t.slice(start, end + 1);
+  try {
+    const parsed = JSON.parse(slice);
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.titulo) return parsed as TemaOption[];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function GeneradorIAPanel({ tituloTesis }: { tituloTesis?: string }) {
   const [plantillaStr, setPlantillaStr] = useState<string | null>(null);
   const [plantillaExt, setPlantillaExt] = useState<string | null>(null);
