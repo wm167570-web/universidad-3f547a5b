@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, FileUp, FileDown, Sparkles, Wand2, CheckCircle2, ChevronRight } from "lucide-react";
+import { Loader2, FileUp, FileDown, Sparkles, Wand2, CheckCircle2, ChevronRight, Check, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   generarDefinicionTema,
@@ -20,6 +20,35 @@ import {
 import { exportarTesisWord } from "@/lib/word-export-tesis";
 import { supabase } from "@/integrations/supabase/client";
 
+interface TemaOption {
+  numero: number;
+  titulo: string;
+  variableIndependiente: string;
+  variableDependiente: string;
+  problema: string;
+  justificacion: string;
+  enfoqueMetodologico: string;
+}
+
+function extraerJSON(texto: string): TemaOption[] | null {
+  if (!texto) return null;
+  let t = texto.trim();
+  // strip code fences
+  t = t.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  // find first '[' to last ']'
+  const start = t.indexOf("[");
+  const end = t.lastIndexOf("]");
+  if (start === -1 || end === -1 || end <= start) return null;
+  const slice = t.slice(start, end + 1);
+  try {
+    const parsed = JSON.parse(slice);
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.titulo) return parsed as TemaOption[];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function GeneradorIAPanel({ tituloTesis }: { tituloTesis?: string }) {
   const [plantillaStr, setPlantillaStr] = useState<string | null>(null);
   const [plantillaExt, setPlantillaExt] = useState<string | null>(null);
@@ -32,6 +61,8 @@ export function GeneradorIAPanel({ tituloTesis }: { tituloTesis?: string }) {
   const [area, setArea] = useState("");
   const [tema, setTema] = useState("");
   const [loading1, setLoading1] = useState(false);
+  const [temasPropuestos, setTemasPropuestos] = useState<TemaOption[]>([]);
+  const [temaSeleccionado, setTemaSeleccionado] = useState<TemaOption | null>(null);
 
   // Componente 2: Planteamiento
   const [planteamiento, setPlanteamiento] = useState("");
@@ -214,31 +245,56 @@ export function GeneradorIAPanel({ tituloTesis }: { tituloTesis?: string }) {
 
       <div className="space-y-8 pl-4 border-l-2 border-muted relative">
         {/* COMPONENTE 1 */}
-        <GeneradorPaso
-          num={1}
-          titulo="Definición de la Tesis"
-          descripcion="Propuesta de 5 temas innovadores en tu área. (Edita el resultado para dejar solo el tema seleccionado)."
-          inputValue={area}
-          setInputValue={setArea}
-          inputPlaceholder="Ej: Agroindustria, ODS, Sostenibilidad Corporativa..."
-          inputLabel="Área de investigación"
-          outputValue={tema}
-          setOutputValue={setTema}
+        <DefinicionTemaPaso
+          area={area}
+          setArea={setArea}
+          tema={tema}
+          setTema={setTema}
           loading={loading1}
+          temasPropuestos={temasPropuestos}
+          temaSeleccionado={temaSeleccionado}
           onGenerate={async () => {
             if (!area.trim()) return toast.error("Ingresa un área");
             setLoading1(true);
             try {
               const headers = await getAuthHeaders();
               const res = await generarDefinicionTema({ headers, data: { area } });
-              setTema(res.contenido);
+              const parsed = extraerJSON(res.contenido);
+              if (parsed) {
+                setTemasPropuestos(parsed);
+                setTemaSeleccionado(null);
+                setTema("");
+              } else {
+                // Fallback: mostrar texto plano en el textarea editable
+                setTemasPropuestos([]);
+                setTemaSeleccionado(null);
+                setTema(res.contenido);
+              }
               toast.success("Temas generados");
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Error");
             } finally { setLoading1(false); }
           }}
+          onSelectTema={(t) => setTemaSeleccionado(t)}
+          onConfirmTema={() => {
+            if (!temaSeleccionado) return;
+            const textoTema = `Título: ${temaSeleccionado.titulo}
+Variable independiente: ${temaSeleccionado.variableIndependiente}
+Variable dependiente: ${temaSeleccionado.variableDependiente}
+Problema: ${temaSeleccionado.problema}
+Justificación: ${temaSeleccionado.justificacion}
+Enfoque metodológico: ${temaSeleccionado.enfoqueMetodologico}`;
+            setTema(textoTema);
+            toast.success("Tema seleccionado");
+          }}
+          onResetTemas={() => {
+            setTemasPropuestos([]);
+            setTemaSeleccionado(null);
+            setTema("");
+          }}
           onHumanize={() => handleHumanizar(tema, setTema, setLoading1)}
         />
+
 
         {/* COMPONENTE 2 */}
         <GeneradorPaso
@@ -469,6 +525,149 @@ function GeneradorPaso({
                 value={outputValue} 
                 onChange={e => setOutputValue(e.target.value)} 
                 rows={12} 
+                className="font-mono text-sm resize-y"
+                placeholder={loading ? "Generando contenido..." : ""}
+              />
+              {loading && (
+                <div className="absolute inset-0 bg-background/50 flex items-center justify-center rounded-md top-8">
+                  <Loader2 className="size-8 animate-spin text-primary" />
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function DefinicionTemaPaso({
+  area, setArea, tema, setTema, loading,
+  temasPropuestos, temaSeleccionado,
+  onGenerate, onSelectTema, onConfirmTema, onResetTemas, onHumanize,
+}: {
+  area: string;
+  setArea: (v: string) => void;
+  tema: string;
+  setTema: (v: string) => void;
+  loading: boolean;
+  temasPropuestos: TemaOption[];
+  temaSeleccionado: TemaOption | null;
+  onGenerate: () => void;
+  onSelectTema: (t: TemaOption) => void;
+  onConfirmTema: () => void;
+  onResetTemas: () => void;
+  onHumanize: () => void;
+}) {
+  const temaConfirmado = !!tema && temasPropuestos.length === 0 && temaSeleccionado === null;
+  const tituloConfirmado = (() => {
+    if (!temaConfirmado) return null;
+    const match = tema.match(/^Título:\s*(.+)$/m);
+    return match ? match[1] : null;
+  })();
+
+  return (
+    <div className="relative">
+      <div className="absolute -left-[31px] top-4 size-7 rounded-full bg-background border-2 border-primary flex items-center justify-center font-bold text-xs text-primary z-10 shadow-sm">
+        1
+      </div>
+
+      <Card className="ml-4 mb-4 border border-border/50 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-xl flex items-center gap-2">
+            Definición de la Tesis
+            {tema.trim() && <CheckCircle2 className="size-5 text-success ml-auto" />}
+          </CardTitle>
+          <CardDescription>
+            Genera 5 propuestas de tema y elige una tarjeta para continuar con los siguientes pasos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Área de investigación</label>
+            <Input
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="Ej: Agroindustria, ODS, Sostenibilidad Corporativa..."
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button onClick={onGenerate} disabled={loading} className="flex-1 sm:flex-none">
+              {loading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+              Generar
+            </Button>
+            {tituloConfirmado && (
+              <Button variant="outline" onClick={onHumanize} disabled={loading} className="flex-1 sm:flex-none">
+                <Wand2 className="size-4 mr-2" /> Humanizar
+              </Button>
+            )}
+          </div>
+
+          {tituloConfirmado && (
+            <div className="pt-4">
+              <div className="flex items-start justify-between gap-3 p-4 rounded-lg border border-primary/40 bg-primary/5">
+                <div className="flex items-start gap-2">
+                  <Check className="size-4 mt-0.5 text-primary" />
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Tema seleccionado</p>
+                    <p className="font-medium">{tituloConfirmado}</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" onClick={onResetTemas}>
+                  <RotateCcw className="size-3 mr-1" /> Cambiar tema
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {temasPropuestos.length > 0 && (
+            <div className="pt-4 space-y-3">
+              <label className="text-sm font-medium block">Elige uno de los 5 temas propuestos:</label>
+              {temasPropuestos.map((t) => {
+                const selected = temaSeleccionado?.numero === t.numero;
+                return (
+                  <button
+                    key={t.numero}
+                    type="button"
+                    onClick={() => onSelectTema(t)}
+                    className={`w-full text-left rounded-lg border-2 p-4 transition-all ${
+                      selected
+                        ? "border-primary bg-primary/10 shadow-md"
+                        : "border-border/50 hover:border-primary/60 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <Badge variant={selected ? "default" : "secondary"}>Tema {t.numero}</Badge>
+                      {selected && <Check className="size-5 text-primary" />}
+                    </div>
+                    <h4 className="font-bold text-base leading-snug mb-2">{t.titulo}</h4>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p><span className="font-medium text-foreground/80">VI:</span> {t.variableIndependiente}</p>
+                      <p><span className="font-medium text-foreground/80">VD:</span> {t.variableDependiente}</p>
+                      <p className="line-clamp-2"><span className="font-medium text-foreground/80">Problema:</span> {t.problema}</p>
+                    </div>
+                  </button>
+                );
+              })}
+
+              <Button
+                onClick={onConfirmTema}
+                disabled={!temaSeleccionado}
+                className="w-full sm:w-auto mt-2"
+              >
+                Continuar con este tema <ChevronRight className="size-4 ml-1" />
+              </Button>
+            </div>
+          )}
+
+          {temasPropuestos.length === 0 && !tituloConfirmado && (tema || loading) && (
+            <div className="pt-4 relative">
+              <label className="text-sm font-medium mb-2 block">Resultado Editable (fallback):</label>
+              <Textarea
+                value={tema}
+                onChange={(e) => setTema(e.target.value)}
+                rows={12}
                 className="font-mono text-sm resize-y"
                 placeholder={loading ? "Generando contenido..." : ""}
               />

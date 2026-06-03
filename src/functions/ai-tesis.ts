@@ -55,7 +55,21 @@ export const generarDefinicionTema = createServerFn({ method: "POST" })
     const email = context.claims.email as string | undefined;
     await consumeCredit(context.supabase, context.userId, email);
 
-    const prompt = `Actúa como investigador experto en metodología de la investigación con enfoque en sostenibilidad corporativa. Propón 5 temas de tesis innovadores, viables y específicos en el área de ${data.area}, considerando el contexto de Colombia. Cada tema debe incluir: título claro y delimitado, variable independiente y variable dependiente, problema que resuelve, justificación breve (máximo 3 líneas), enfoque metodológico sugerido. Evita temas genéricos. Temas aplicables, actuales (2020-2026), con posibilidad de obtener datos reales. Redacción humanizada. Estructura la salida en formato Markdown.`;
+    const prompt = `Actúa como investigador experto en metodología de la investigación con enfoque en sostenibilidad corporativa. Propón 5 temas de tesis innovadores, viables y específicos en el área de ${data.area}, considerando el contexto de Colombia. Cada tema debe incluir: título claro y delimitado, variable independiente y variable dependiente, problema que resuelve, justificación breve (máximo 3 líneas), enfoque metodológico sugerido. Evita temas genéricos. Temas aplicables, actuales (2020-2026), con posibilidad de obtener datos reales. Redacción humanizada.
+
+Devuelve los 5 temas en formato JSON estricto, sin texto adicional, sin bloques de código markdown, sin explicaciones. Solo el JSON con esta estructura exacta:
+[
+  {
+    "numero": 1,
+    "titulo": "...",
+    "variableIndependiente": "...",
+    "variableDependiente": "...",
+    "problema": "...",
+    "justificacion": "...",
+    "enfoqueMetodologico": "..."
+  }
+]
+(5 objetos en total)`;
     
     const contenido = await callAI([{ role: "user", content: prompt }]);
     return { contenido };
