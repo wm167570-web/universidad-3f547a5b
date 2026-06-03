@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.consume_ai_credit(uuid, text) TO authenticated;
