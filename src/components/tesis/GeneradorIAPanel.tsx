@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, FileUp, FileDown, Sparkles, Wand2, CheckCircle2, ChevronRight } from "lucide-react";
+import { Loader2, FileUp, FileDown, Sparkles, Wand2, CheckCircle2, ChevronRight, Check, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   generarDefinicionTema,
