@@ -245,31 +245,56 @@ export function GeneradorIAPanel({ tituloTesis }: { tituloTesis?: string }) {
 
       <div className="space-y-8 pl-4 border-l-2 border-muted relative">
         {/* COMPONENTE 1 */}
-        <GeneradorPaso
-          num={1}
-          titulo="Definición de la Tesis"
-          descripcion="Propuesta de 5 temas innovadores en tu área. (Edita el resultado para dejar solo el tema seleccionado)."
-          inputValue={area}
-          setInputValue={setArea}
-          inputPlaceholder="Ej: Agroindustria, ODS, Sostenibilidad Corporativa..."
-          inputLabel="Área de investigación"
-          outputValue={tema}
-          setOutputValue={setTema}
+        <DefinicionTemaPaso
+          area={area}
+          setArea={setArea}
+          tema={tema}
+          setTema={setTema}
           loading={loading1}
+          temasPropuestos={temasPropuestos}
+          temaSeleccionado={temaSeleccionado}
           onGenerate={async () => {
             if (!area.trim()) return toast.error("Ingresa un área");
             setLoading1(true);
             try {
               const headers = await getAuthHeaders();
               const res = await generarDefinicionTema({ headers, data: { area } });
-              setTema(res.contenido);
+              const parsed = extraerJSON(res.contenido);
+              if (parsed) {
+                setTemasPropuestos(parsed);
+                setTemaSeleccionado(null);
+                setTema("");
+              } else {
+                // Fallback: mostrar texto plano en el textarea editable
+                setTemasPropuestos([]);
+                setTemaSeleccionado(null);
+                setTema(res.contenido);
+              }
               toast.success("Temas generados");
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Error");
             } finally { setLoading1(false); }
           }}
+          onSelectTema={(t) => setTemaSeleccionado(t)}
+          onConfirmTema={() => {
+            if (!temaSeleccionado) return;
+            const textoTema = `Título: ${temaSeleccionado.titulo}
+Variable independiente: ${temaSeleccionado.variableIndependiente}
+Variable dependiente: ${temaSeleccionado.variableDependiente}
+Problema: ${temaSeleccionado.problema}
+Justificación: ${temaSeleccionado.justificacion}
+Enfoque metodológico: ${temaSeleccionado.enfoqueMetodologico}`;
+            setTema(textoTema);
+            toast.success("Tema seleccionado");
+          }}
+          onResetTemas={() => {
+            setTemasPropuestos([]);
+            setTemaSeleccionado(null);
+            setTema("");
+          }}
           onHumanize={() => handleHumanizar(tema, setTema, setLoading1)}
         />
+
 
         {/* COMPONENTE 2 */}
         <GeneradorPaso
