@@ -32,6 +32,8 @@ export function GeneradorIAPanel({ tituloTesis }: { tituloTesis?: string }) {
   const [area, setArea] = useState("");
   const [tema, setTema] = useState("");
   const [loading1, setLoading1] = useState(false);
+  const [temasPropuestos, setTemasPropuestos] = useState<TemaOption[]>([]);
+  const [temaSeleccionado, setTemaSeleccionado] = useState<TemaOption | null>(null);
 
   // Componente 2: Planteamiento
   const [planteamiento, setPlanteamiento] = useState("");
